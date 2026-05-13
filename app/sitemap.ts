@@ -7,7 +7,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = getSiteUrl();
   const now = new Date();
 
-  const staticPaths = ["", "/luyen-de", "/khoa-hoc"];
+  const staticPaths = [""];
 
   const staticEntries: MetadataRoute.Sitemap = staticPaths.map((p, i) => ({
     url: p === "" ? `${base}/` : `${base}${p}`,

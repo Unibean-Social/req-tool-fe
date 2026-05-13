@@ -1,9 +1,12 @@
+"use client";
+
 import Link from "next/link";
 import { Phone, Star } from "lucide-react";
 import { Suspense, type ReactNode } from "react";
 
 import { Card } from "@/components/ui/card";
 import { SafeImage } from "@/components/ui/safe-image";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 
 function AuthBrandMark({ className }: { className?: string }) {
@@ -79,6 +82,8 @@ function AuthMarketingAside() {
 }
 
 export default function AuthRouteGroupLayout({ children }: { children: ReactNode }) {
+  const isMobile = useIsMobile();
+
   return (
     <div className="flex min-h-svh w-full flex-1 items-center justify-center bg-background px-3 py-4 sm:px-5 sm:py-6 md:px-8 md:py-8">
       <Card
@@ -89,7 +94,12 @@ export default function AuthRouteGroupLayout({ children }: { children: ReactNode
         )}
       >
         <div className="flex min-h-0 flex-1 flex-col md:flex-row">
-          <div className="relative z-0 flex w-full flex-1 flex-col border-border/30 border-b md:w-1/2 md:min-h-0 md:border-b-0 md:border-r">
+          <div
+            className={cn(
+              "relative z-0 flex w-full flex-1 flex-col border-border/30 md:w-1/2 md:min-h-0 md:border-r",
+              !isMobile && "border-b md:border-b-0"
+            )}
+          >
             <div className="mx-auto flex w-full max-w-[29rem] flex-1 flex-col gap-10 px-6 py-10 sm:gap-12 sm:px-8 sm:py-12 lg:px-10 lg:py-14">
               <AuthBrandMark />
               <div className="flex min-h-0 flex-1 flex-col">
@@ -106,9 +116,11 @@ export default function AuthRouteGroupLayout({ children }: { children: ReactNode
             </div>
           </div>
 
-          <div className="relative isolate flex min-h-[42vh] w-full flex-1 flex-col overflow-hidden md:min-h-0 md:w-1/2">
-            <AuthMarketingAside />
-          </div>
+          {!isMobile && (
+            <div className="relative isolate flex min-h-[42vh] w-full flex-1 flex-col overflow-hidden md:min-h-0 md:w-1/2">
+              <AuthMarketingAside />
+            </div>
+          )}
         </div>
       </Card>
     </div>

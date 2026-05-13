@@ -1,26 +1,134 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Brand: #091413 #285A48 #408A71 #B0E4CC — CTA, ring, chart, overlay (brand-dark).
+ * #091413 có sắc xanh đậm: dùng cho token / overlay, KHÔNG làm nền trang (sẽ “ám xanh”).
+ * Nền app: neutral gần đen (#101010).
+ */
+:root,
+.dark {
+  --brand-abyss: #091413;
+  --brand-canopy: #285a48;
+  --brand-jade: #408a71;
+  --brand-mint: #b0e4cc;
+  --brand-dark: #091413;
+
+  --background: #101010;
+  --foreground: #e8f1ec;
+
+  --primary: #408a71;
+  --primary-foreground: #091413;
+
+  --secondary: #285a48;
+  --secondary-foreground: #e8f1ec;
+
+  /* Hover / accent surface: neutral */
+  --accent: #252525;
+  --accent-foreground: #e8f1ec;
+
+  --muted: #1a1a1a;
+  --muted-foreground: #9ca8a3;
+
+  --destructive: #f97373;
+  --destructive-foreground: #091413;
+
+  --border: #2a2a2a;
+  --input: #141414;
+  --ring: #408a71;
+
+  --card: #141414;
+  --card-foreground: #e8f1ec;
+
+  --popover: #181818;
+  --popover-foreground: #e8f1ec;
+
+  --radius: 0.75rem;
+
+  --chart-1: #408a71;
+  --chart-2: #285a48;
+  --chart-3: #b0e4cc;
+  --chart-4: #5aac8f;
+  --chart-5: #1e4d3f;
+
+  --sidebar: #0c0c0c;
+  --sidebar-foreground: #e8f1ec;
+  --sidebar-primary: #408a71;
+  --sidebar-primary-foreground: #091413;
+  --sidebar-accent: #1f1f1f;
+  --sidebar-accent-foreground: #e8f1ec;
+  --sidebar-border: #2a2a2a;
+  --sidebar-ring: #408a71;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-brand-abyss: #091413;
+  --color-brand-canopy: #285a48;
+  --color-brand-jade: #408a71;
+  --color-brand-mint: #b0e4cc;
+  --color-brand-dark: #091413;
+
+  --color-background: #101010;
+  --color-foreground: #e8f1ec;
+
+  --font-sans: var(--font-open-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  --font-heading: var(--font-sans);
+
+  --color-sidebar-ring: #408a71;
+  --color-sidebar-border: #2a2a2a;
+  --color-sidebar-accent-foreground: #e8f1ec;
+  --color-sidebar-accent: #1f1f1f;
+  --color-sidebar-primary-foreground: #091413;
+  --color-sidebar-primary: #408a71;
+  --color-sidebar-foreground: #e8f1ec;
+  --color-sidebar: #0c0c0c;
+
+  --color-chart-5: #1e4d3f;
+  --color-chart-4: #5aac8f;
+  --color-chart-3: #b0e4cc;
+  --color-chart-2: #285a48;
+  --color-chart-1: #408a71;
+
+  --color-ring: #408a71;
+  --color-input: #141414;
+  --color-border: #2a2a2a;
+  --color-destructive: #f97373;
+  --color-destructive-foreground: #091413;
+  --color-accent-foreground: #e8f1ec;
+  --color-accent: #252525;
+  --color-muted-foreground: #9ca8a3;
+  --color-muted: #1a1a1a;
+  --color-secondary-foreground: #e8f1ec;
+  --color-secondary: #285a48;
+  --color-primary-foreground: #091413;
+  --color-primary: #408a71;
+  --color-popover-foreground: #e8f1ec;
+  --color-popover: #181818;
+  --color-card-foreground: #e8f1ec;
+  --color-card: #141414;
+
+  --radius-sm: calc(var(--radius) * 0.55);
+  --radius-md: calc(var(--radius) * 0.72);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.25);
+  --radius-2xl: calc(var(--radius) * 1.55);
+  --radius-3xl: calc(var(--radius) * 1.9);
+  --radius-4xl: calc(var(--radius) * 2.25);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
   }
-}
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  html {
+    @apply font-sans antialiased;
+    color-scheme: dark;
+  }
+  body {
+    @apply bg-background text-foreground min-h-screen;
+  }
 }

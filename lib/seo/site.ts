@@ -1,0 +1,19 @@
+/**
+ * Static site branding and origin helpers (build-time / env).
+ * @see docs/SEO.md
+ */
+
+export const SITE = {
+  name: "REQ-Bean9",
+  shortName: "REQ-Bean9",
+  defaultDescription:
+    "Nền tảng học tập và luyện đề — nội dung công khai, SEO-friendly, App Router.",
+  locale: "vi_VN" as const,
+};
+
+/** Production: set NEXT_PUBLIC_APP_URL without trailing slash (e.g. https://example.com). */
+export function getSiteUrl(): string {
+  const raw = process.env.NEXT_PUBLIC_APP_URL?.trim();
+  if (raw) return raw.replace(/\/+$/, "");
+  return "http://localhost:3000";
+}

@@ -1,8 +1,17 @@
-export interface ApiResponse<T> {
+/** Metadata phân trang danh sách (nếu API trả kèm). */
+export interface ListPageMetadata {
+  pageNumber?: number;
+  totalPages?: number;
+  totalItems?: number;
+  hasPreviousPage?: boolean;
+  hasNextPage?: boolean;
+}
+
+export interface ApiResponse<T, TMetadata = unknown> {
   isSuccess: boolean;
   message: string;
   data: T;
-  metadata?: unknown;
+  metadata?: TMetadata;
 }
 
 export interface ApiErrorShape {

@@ -9,9 +9,10 @@ alwaysApply: true
 2. **Đọc code xung quanh** — Khớp style import, naming, patterns hiện có; không refactor lan man ngoài phạm vi task.
 3. **Data GET / đọc server** — Dùng TanStack Query (`useCachedGet` hoặc `useQuery` với `queryKey` ổn định). Không gọi GET trực tiếp trong `useEffect` nếu có thể thay bằng query có cache. Chi tiết: rule `data-fetching.mdc` và skill `.cursor/skills/req-tool-data-fetching/`.
 4. **Sau mutation** — `invalidateQueries` theo `queryKeys` cụ thể; tránh `invalidateQueries()` không đối số (trừ khi thật sự cần xóa toàn bộ cache).
-5. **Auth / cookie** — Giữ đồng bộ với `lib/redux/slices/authSlice`, `lib/api/core`, middleware hiện có; không tự ý đổi flow token trừ khi task yêu cầu.
+5. **Auth / cookie** — Giữ đồng bộ với `lib/redux/slices/authSlice`, `lib/api/core`, `proxy.ts` hiện có; không tự ý đổi flow token trừ khi task yêu cầu.
 
 # Ưu tiên trung bình
 
 - UI: dùng component `components/ui/*` (shadcn) và token spacing/typography đã có.
 - Thông báo lỗi/thành công: `sonner` như các màn auth hiện tại.
+- **Đặt tên file** trong `app/` (đặc biệt `**/components/`): `.cursor/RULES/file-naming.mdc` và skill `.cursor/skills/req-tool-file-naming/`.

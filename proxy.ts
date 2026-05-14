@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 const AUTH_COOKIE = "authToken";
 
 function isPublicPath(pathname: string): boolean {
-  if (pathname === "/login" || pathname === "/signUp" || pathname === "/forgot-password") return true;
+  if (pathname === "/login") return true;
   if (pathname === "/robots.txt" || pathname === "/sitemap.xml") return true;
   return false;
 }
@@ -14,7 +14,8 @@ function safeRedirectPath(from: string | null): string {
   return from;
 }
 
-export function middleware(request: NextRequest) {
+/** Next.js 16+: `proxy` thay cho `middleware` (cùng Edge boundary, cookie redirect). */
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const token = request.cookies.get(AUTH_COOKIE)?.value;
 
@@ -25,7 +26,7 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if (token && (pathname === "/login" || pathname === "/signUp" || pathname === "/forgot-password")) {
+  if (token && pathname === "/login") {
     const from = safeRedirectPath(request.nextUrl.searchParams.get("from"));
     const url = request.nextUrl.clone();
     url.pathname = from;

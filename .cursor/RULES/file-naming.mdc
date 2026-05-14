@@ -1,0 +1,33 @@
+---
+description: Đặt tên file TS/TSX trong App Router — camelCase cho module con, giữ convention Next đặc biệt
+globs:
+  - app/**/*.tsx
+  - app/**/*.ts
+alwaysApply: false
+---
+
+# Đặt tên file trong `app/`
+
+## Module trong thư mục `components/` của route (ví dụ `app/(org)/[slug]/members/components/`)
+
+- Dùng **camelCase** cho tên file: `membersFlow.tsx`, `orgAppHeader.tsx`, `orgOnboardingFlow.tsx`.
+- Tránh **kebab-case** dài kiểu `org-members-side-panel.tsx` trừ khi codebase cũ chưa migrate.
+- Một file một “đơn vị” rõ (screen phụ, graph build, panel); tên ngắn, đúng vai trò.
+
+## File đặc biệt của Next.js (không đổi)
+
+- `page.tsx`, `layout.tsx`, `loading.tsx`, `error.tsx`, `not-found.tsx`, `route.ts`, `template.tsx` — giữ tên và vị trí theo [App Router](https://nextjs.org/docs/app).
+
+## Ngoài `app/`
+
+- `components/ui/*`: giữ convention shadcn / repo hiện có (thường kebab cho primitive).
+- `hooks/`, `lib/`: camelCase (`useUser.ts`, `fetchUser.ts`).
+
+## React context dùng trong route
+
+- **Không** import `useContext` / hook từ cùng file `layout.tsx` mà consumer nằm ở file khác (Turbopack/Webpack có thể tách **hai bản** module → hai `createContext` → runtime không khớp Provider).
+- Đặt `createContext` + hook trong một file riêng (ví dụ `orgWorkspaceContext.tsx`) rồi `layout` và mọi consumer cùng import từ file đó.
+
+## Export
+
+- File camelCase vẫn có thể export component **PascalCase** (`membersFlow.tsx` → `export function MembersFlow` hoặc giữ tên cũ nếu đã public API); ưu tiên **không đổi tên export** chỉ vì đổi tên file, tránh diff lan rộng.

@@ -1,6 +1,16 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  async redirects() {
+    return [
+      { source: "/signUp", destination: "/login", permanent: true },
+      {
+        source: "/forgot-password",
+        destination: "/login",
+        permanent: true,
+      },
+    ];
+  },
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "images.unsplash.com" },

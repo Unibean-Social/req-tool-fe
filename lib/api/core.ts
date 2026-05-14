@@ -2,6 +2,8 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from "axios";
 import { deleteCookie } from "cookies-next";
 
+import { formatMessageFromValidationBody } from "@/lib/api/getApiErrorMessage";
+
 let store: any;
 export const injectStore = (_store: any) => {
   store = _store;
@@ -117,17 +119,31 @@ class ApiService {
 
             return Promise.reject({
               code: 401,
-              message: "Session expired. Please login again.",
+              message: "Đăng nhập hết hạn. Vui lòng đăng nhập lại.",
               status: false,
             } as ApiError);
           }
         }
 
+        const rawData = error.response?.data;
+        const validationMsg = formatMessageFromValidationBody(rawData);
+        const dataMessage =
+          rawData &&
+          typeof rawData === "object" &&
+          "message" in rawData &&
+          typeof (rawData as { message: unknown }).message === "string"
+            ? (rawData as { message: string }).message.trim()
+            : "";
+
         const apiError: ApiError = {
           code: error.response?.status,
-          message: error.response?.data?.message || error.message || "Có lỗi xảy ra",
+          message:
+            validationMsg ||
+            dataMessage ||
+            error.message ||
+            "Đã xảy ra lỗi",
           status: false,
-          data: error.response?.data,
+          data: rawData,
         };
 
         return Promise.reject(apiError);

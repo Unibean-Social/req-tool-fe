@@ -2,6 +2,7 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from "axios";
 import { deleteCookie } from "cookies-next";
 
+import { buildLoginUrl } from "@/lib/auth/session";
 import { formatMessageFromValidationBody } from "@/lib/api/getApiErrorMessage";
 
 let store: any;
@@ -41,6 +42,30 @@ class ApiService {
     this.failedQueue = [];
   }
 
+  private sessionEndedRedirecting = false;
+
+  private async endSessionAndRedirectToLogin(): Promise<void> {
+    if (typeof window === "undefined" || this.sessionEndedRedirecting) return;
+    this.sessionEndedRedirecting = true;
+
+    if (store) {
+      const { logout } = await import("@/lib/redux/slices/authSlice");
+      store.dispatch(logout());
+    } else {
+      deleteCookie("authToken", { path: "/" });
+    }
+
+    window.dispatchEvent(new Event("logout"));
+
+    const loginUrl = buildLoginUrl(window.location.pathname);
+    window.location.replace(loginUrl);
+  }
+
+  private isRefreshTokenRequest(config: AxiosRequestConfig | undefined): boolean {
+    const url = config?.url ?? "";
+    return url.includes("refresh-token");
+  }
+
   private setupInterceptors() {
     this.client.interceptors.request.use(
       (config) => {
@@ -57,7 +82,22 @@ class ApiService {
       async (error) => {
         const originalRequest = error.config;
 
-        if (error.response?.status === 401 && !originalRequest._retry) {
+        if (error.response?.status === 401) {
+          const refreshToken = store?.getState()?.auth?.refreshToken;
+          const shouldRefresh =
+            !originalRequest._retry &&
+            !this.isRefreshTokenRequest(originalRequest) &&
+            Boolean(refreshToken);
+
+          if (!shouldRefresh) {
+            void this.endSessionAndRedirectToLogin();
+            return Promise.reject({
+              code: 401,
+              message: "Đăng nhập hết hạn. Vui lòng đăng nhập lại.",
+              status: false,
+            } as ApiError);
+          }
+
           if (this.isRefreshing) {
             return new Promise((resolve, reject) => {
               this.failedQueue.push({ resolve, reject });
@@ -73,9 +113,6 @@ class ApiService {
           this.isRefreshing = true;
 
           try {
-            const refreshToken = store?.getState()?.auth?.refreshToken;
-            if (!refreshToken) throw new Error("No refresh token");
-
             const response = await axios.post(
               `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080/"}api/v1/auth/refresh-token`,
               { refreshToken },
@@ -106,16 +143,7 @@ class ApiService {
           } catch (refreshError) {
             this.isRefreshing = false;
             this.processQueue(refreshError, null);
-
-            deleteCookie("authToken", { path: "/" });
-            if (store) {
-              const { logout } = await import("@/lib/redux/slices/authSlice");
-              store.dispatch(logout());
-            }
-
-            if (typeof window !== "undefined") {
-              window.dispatchEvent(new Event("logout"));
-            }
+            void this.endSessionAndRedirectToLogin();
 
             return Promise.reject({
               code: 401,

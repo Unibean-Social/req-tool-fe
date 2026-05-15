@@ -3,7 +3,6 @@ import { createSlice, createAsyncThunk, type PayloadAction } from "@reduxjs/tool
 import { setCookie, deleteCookie } from "cookies-next";
 import { jwtDecode } from "jwt-decode";
 import apiService from "@/lib/api/core";
-import { fetchAuth } from "@/lib/api/services/fetchAuth";
 import { getAuthCookieConfig } from "@/utils/cookieConfig";
 import type { RootState, AppDispatch } from "../store";
 
@@ -11,6 +10,7 @@ export interface User {
   id: string;
   email: string;
   userNname: string;
+
   role: string[];
 }
 
@@ -46,6 +46,9 @@ export const decodeToken = (token: string): User | null => {
     if (decoded.role && !Array.isArray(decoded.role)) {
       decoded.role = [decoded.role];
     }
+    if (!decoded.id && typeof decoded.sub === "string") {
+      decoded.id = decoded.sub;
+    }
     return decoded as User;
   } catch {
     return null;
@@ -57,6 +60,9 @@ export const decodeTokenWithExpiry = (token: string): DecodedToken | null => {
     const decoded: any = jwtDecode(token);
     if (decoded.role && !Array.isArray(decoded.role)) {
       decoded.role = [decoded.role];
+    }
+    if (!decoded.id && typeof decoded.sub === "string") {
+      decoded.id = decoded.sub;
     }
     return decoded as DecodedToken;
   } catch {
@@ -90,40 +96,20 @@ export const clearAutoRefresh = () => {
   }
 };
 
-export const loginAsync = createAsyncThunk(
-  "auth/login",
-  async (credentials: { email: string; password: string }, { rejectWithValue }) => {
-    try {
-      const response = await fetchAuth.login(credentials);
+function clearAuthClientSession() {
+  deleteCookie("authToken", { path: "/" });
+  apiService.setAuthToken(null);
+  clearAutoRefresh();
+}
 
-      if (response.isSuccess && response.data.accessToken) {
-        const { accessToken, refreshToken } = response.data;
-        const user = decodeToken(accessToken);
-
-        setCookie("authToken", accessToken, getAuthCookieConfig());
-        apiService.setAuthToken(accessToken);
-
-        return { token: accessToken, refreshToken, user };
-      }
-
-      return rejectWithValue(response.message || "Login failed");
-    } catch (error: any) {
-      return rejectWithValue(error.message || "Login failed");
-    }
-  }
-);
-
-export const logoutAsync = createAsyncThunk("auth/logout", async (_, { rejectWithValue }) => {
-  try {
-    await apiService.post("/api/v1/auth/logout");
-    deleteCookie("authToken", { path: "/" });
-    apiService.setAuthToken(null);
-    clearAutoRefresh();
-    return true;
-  } catch (error: any) {
-    return rejectWithValue(error.message);
-  }
-});
+function resetAuthStateFields(state: AuthState) {
+  state.user = null;
+  state.token = null;
+  state.refreshToken = null;
+  state.isAuthenticated = false;
+  state.isLoading = false;
+  state.error = null;
+}
 
 export const refreshTokenAsync = createAsyncThunk(
   "auth/refreshToken",
@@ -175,47 +161,14 @@ const authSlice = createSlice({
       }
     },
     logout: (state) => {
-      state.user = null;
-      state.token = null;
-      state.refreshToken = null;
-      state.isAuthenticated = false;
-      state.error = null;
-      deleteCookie("authToken", { path: "/" });
-      apiService.setAuthToken(null);
-      clearAutoRefresh();
+      resetAuthStateFields(state);
+      clearAuthClientSession();
     },
     clearError: (state) => {
       state.error = null;
     },
   },
   extraReducers: (builder) => {
-    builder
-      .addCase(loginAsync.pending, (state) => {
-        state.isLoading = true;
-        state.error = null;
-      })
-      .addCase(loginAsync.fulfilled, (state, action) => {
-        state.isLoading = false;
-        state.token = action.payload.token;
-        state.refreshToken = action.payload.refreshToken ?? null;
-        state.user = action.payload.user;
-        state.isAuthenticated = Boolean(action.payload.token);
-        state.error = null;
-      })
-      .addCase(loginAsync.rejected, (state, action) => {
-        state.isLoading = false;
-        state.error = action.payload as string;
-      });
-
-    builder.addCase(logoutAsync.fulfilled, (state) => {
-      state.user = null;
-      state.token = null;
-      state.refreshToken = null;
-      state.isAuthenticated = false;
-      state.isLoading = false;
-      state.error = null;
-    });
-
     builder
       .addCase(refreshTokenAsync.fulfilled, (state, action) => {
         state.token = action.payload.token;

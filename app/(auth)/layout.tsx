@@ -1,13 +1,27 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Phone, Star } from "lucide-react";
 import { Suspense, type ReactNode } from "react";
 
 import { Card } from "@/components/ui/card";
 import { SafeImage } from "@/components/ui/safe-image";
+import { useGithubOAuthPopupResult } from "@/hooks/useGithub";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
+
+function safeFromSearchParam(raw: string | null): string | undefined {
+  if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return undefined;
+  return raw;
+}
+
+function AuthGithubOAuthListener() {
+  const searchParams = useSearchParams();
+  const from = safeFromSearchParam(searchParams.get("from"));
+  useGithubOAuthPopupResult(from, false);
+  return null;
+}
 
 function AuthBrandMark({ className }: { className?: string }) {
   return (
@@ -67,6 +81,7 @@ function AuthMarketingAside() {
             src="/auth-image.png"
             alt=""
             fill
+            priority
             sizes="(max-width: 768px) 100vw, 800px"
             className="object-contain object-center"
           />
@@ -110,6 +125,7 @@ export default function AuthRouteGroupLayout({ children }: { children: ReactNode
                     </p>
                   }
                 >
+                  <AuthGithubOAuthListener />
                   {children}
                 </Suspense>
               </div>

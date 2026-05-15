@@ -133,9 +133,22 @@ export function useCreateOrgProject(
       return result;
     },
     onSuccess: (data, variables, onMutateResult, context) => {
-      void queryClient.invalidateQueries({
-        queryKey: orgProjectsQueryKey(variables.orgId),
+      const key = orgProjectsQueryKey(variables.orgId);
+      queryClient.setQueryData<OrgProjectsListResponse>(key, (old) => {
+        const created = data.data;
+        if (!old?.data?.length) {
+          return { success: true, data: [created], message: data.message };
+        }
+        if (
+          old.data.some(
+            (p) => p.id === created.id || p.slug === created.slug
+          )
+        ) {
+          return old;
+        }
+        return { ...old, data: [...old.data, created] };
       });
+      void queryClient.invalidateQueries({ queryKey: key });
       toast.success("Đã tạo dự án");
       userOnSuccess?.(data, variables, onMutateResult, context);
     },

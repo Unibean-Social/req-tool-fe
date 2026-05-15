@@ -22,12 +22,16 @@ import { cn } from "@/lib/utils";
 import { useOrgWorkspace } from "../../orgWorkspaceContext";
 
 import { buildOrgMembersFlowGraph } from "./membersFlowGraph";
+import { MemberHeader } from "./memberHeader";
 import {
   OrgGroupBadge,
   OrgMemberCard,
   OrgOwnerCard,
 } from "./membersFlowNodes";
 import { OrgMembersSidePanel } from "./membersSidePanel";
+
+const membersPageOuterClassName =
+  "flex min-h-0 flex-1 flex-col overflow-hidden px-6 pt-6 pb-6 sm:px-8 sm:pt-8 sm:pb-8";
 
 const membersShellClassName =
   "relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl";
@@ -200,16 +204,20 @@ export function Members() {
 
   if (isPending) {
     return (
-      <div className={cn(membersShellClassName)}>
-        <Skeleton className="min-h-0 flex-1 rounded-l-none rounded-r-xl" />
+      <div className={membersPageOuterClassName}>
+        <MemberHeader />
+        <div className={cn(membersShellClassName, "mt-4 min-h-0 flex-1 sm:mt-6")}>
+          <Skeleton className="min-h-0 flex-1 rounded-l-none rounded-r-xl" />
+        </div>
       </div>
     );
   }
 
   if (isError) {
     return (
-      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-        <Alert variant="destructive">
+      <div className={cn(membersPageOuterClassName, "overflow-y-auto")}>
+        <MemberHeader />
+        <Alert className="mt-4 shrink-0 sm:mt-6" variant="destructive">
           <AlertTitle>Không tải được danh sách thành viên</AlertTitle>
           <AlertDescription className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <span>
@@ -231,15 +239,18 @@ export function Members() {
   const list = members ?? [];
 
   return (
-    <div className={membersShellClassName}>
-      <OrgMembersFlow
-        orgId={orgId}
-        ownerId={orgFromList.ownerId}
-        members={list}
-        canManageMembers={canManageOrgMembers}
-        className="min-h-0 flex-1 rounded-l-none rounded-r-xl"
-      />
-      <OrgMembersSidePanel orgId={orgId} ownerId={orgFromList.ownerId} />
+    <div className={membersPageOuterClassName}>
+      <MemberHeader />
+      <div className={cn(membersShellClassName, "mt-4 min-h-0 flex-1 sm:mt-6")}>
+        <OrgMembersFlow
+          orgId={orgId}
+          ownerId={orgFromList.ownerId}
+          members={list}
+          canManageMembers={canManageOrgMembers}
+          className="min-h-0 flex-1 rounded-l-none rounded-r-xl"
+        />
+        <OrgMembersSidePanel orgId={orgId} ownerId={orgFromList.ownerId} />
+      </div>
     </div>
   );
 }

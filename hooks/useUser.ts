@@ -16,8 +16,8 @@ import { fetchUser } from "@/lib/api/services/fetchUser";
 import { queryKeys } from "@/lib/query/query-keys";
 
 import type {
-  AddOrgMemberRequest,
-  AddOrgMemberResponse,
+  AddOrgMembersRequest,
+  AddOrgMembersResponse,
   OrgMember,
   OrgMembersListParams,
   OrgMembersResponse,
@@ -372,14 +372,14 @@ export function flattenUserSearchInfinitePages(
   return pages?.flatMap((p) => p.items) ?? [];
 }
 
-type AddOrgMemberVariables = {
+type AddOrgMembersVariables = {
   orgId: string;
-  body: AddOrgMemberRequest;
+  body: AddOrgMembersRequest;
 };
 
 export function useAddOrgMember(
   options?: Omit<
-    UseMutationOptions<AddOrgMemberResponse, Error, AddOrgMemberVariables>,
+    UseMutationOptions<AddOrgMembersResponse, Error, AddOrgMembersVariables>,
     "mutationFn"
   >
 ) {
@@ -392,8 +392,8 @@ export function useAddOrgMember(
     mutationFn: async ({
       orgId,
       body,
-    }: AddOrgMemberVariables): Promise<AddOrgMemberResponse> => {
-      const result = await fetchUser.addOrgMember(orgId, body);
+    }: AddOrgMembersVariables): Promise<AddOrgMembersResponse> => {
+      const result = await fetchUser.addOrgMembers(orgId, body);
       if (!result.success) {
         throw new Error(result.message ?? "Thêm thành viên thất bại");
       }
@@ -403,7 +403,25 @@ export function useAddOrgMember(
       void queryClient.invalidateQueries({
         queryKey: queryKeys.orgs.members(variables.orgId),
       });
-      toast.success("Đã thêm thành viên");
+      const { added, skipped, notFound } = data.data;
+      if (added.length > 0) {
+        const extra: string[] = [];
+        if (skipped.length > 0) extra.push(`bỏ qua ${skipped.length}`);
+        if (notFound.length > 0) extra.push(`không tìm thấy ${notFound.length}`);
+        toast.success(
+          added.length === 1
+            ? `Đã thêm thành viên${extra.length ? ` (${extra.join(", ")})` : ""}`
+            : `Đã thêm ${added.length} thành viên${extra.length ? ` (${extra.join(", ")})` : ""}`
+        );
+      } else {
+        toast.warning(
+          notFound.length > 0
+            ? `Không tìm thấy: ${notFound.join(", ")}`
+            : skipped.length > 0
+              ? `Đã bỏ qua: ${skipped.join(", ")}`
+              : "Không thêm được thành viên"
+        );
+      }
       userOnSuccess?.(data, variables, onMutateResult, context);
     },
     onError: (error, variables, onMutateResult, context) => {
@@ -457,8 +475,9 @@ export type {
   OrgMemberUser,
   OrgMembersListParams,
   OrgMembersResponse,
-  AddOrgMemberRequest,
-  AddOrgMemberResponse,
+  AddOrgMembersRequest,
+  AddOrgMembersResponse,
+  OrgMemberInviteItem,
   OrgMemberDeleteErrorBody,
   OrgMemberDeleteValidationItem,
   OrgMemberSearchUser,

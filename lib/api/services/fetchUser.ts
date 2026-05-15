@@ -129,14 +129,20 @@ export interface OrgMember {
   userId: string;
   role: string;
   createdAt: string;
-  /** Có khi GET list trả kèm `user`; POST có thể không có. */
+  /** Có khi GET list hoặc POST bulk trả kèm `user`; một số payload có thể thiếu. */
   user: OrgMemberUser | null;
 }
 
-/** POST /api/v1/orgs/:org_id/members — body `{ identifier, role: "member" }`; `data` không embed `user`. */
-export interface AddOrgMemberRequest {
+/** Một dòng trong POST /api/v1/orgs/:org_id/members — `members[]`. */
+export interface OrgMemberInviteItem {
   identifier: string;
-  role: "member";
+  /** Ví dụ `"member"` — backend có thể mở rộng vai trò. */
+  role: string;
+}
+
+/** POST /api/v1/orgs/:org_id/members — body `{ members: [{ identifier, role }] }`. */
+export interface AddOrgMembersRequest {
+  members: OrgMemberInviteItem[];
 }
 
 interface OrgMemberRowApi {
@@ -161,15 +167,27 @@ interface OrgMemberListRowApi extends OrgMemberRowApi {
   user?: OrgMemberUserApi;
 }
 
-interface AddOrgMemberApiResponse {
+interface AddOrgMembersDataApi {
+  added: OrgMemberListRowApi[];
+  skipped: string[];
+  not_found: string[];
+}
+
+interface AddOrgMembersApiResponse {
   success: boolean;
-  data: OrgMemberRowApi;
+  data: AddOrgMembersDataApi;
   message: string | null;
 }
 
-export interface AddOrgMemberResponse {
+export interface AddOrgMembersResponseData {
+  added: OrgMember[];
+  skipped: string[];
+  notFound: string[];
+}
+
+export interface AddOrgMembersResponse {
   success: boolean;
-  data: OrgMember;
+  data: AddOrgMembersResponseData;
   message: string | null;
 }
 
@@ -198,11 +216,17 @@ function mapOrgMemberFromApi(
   };
 }
 
-function mapAddOrgMemberResponse(body: AddOrgMemberApiResponse): AddOrgMemberResponse {
+function mapAddOrgMembersResponse(body: AddOrgMembersApiResponse): AddOrgMembersResponse {
   return {
     success: body.success,
     message: body.message ?? null,
-    data: mapOrgMemberFromApi(body.data),
+    data: {
+      added: body.data.added.map((row) =>
+        mapOrgMemberFromApi(row, row.user ?? null)
+      ),
+      skipped: body.data.skipped ?? [],
+      notFound: body.data.not_found ?? [],
+    },
   };
 }
 
@@ -333,19 +357,21 @@ export const fetchUser = {
     return mapOrgMembersListResponse(response.data);
   },
 
-  /** POST /api/v1/orgs/:org_id/members — path `org_id`, body `identifier` + `role` (member). */
-  addOrgMember: async (
+  /** POST /api/v1/orgs/:org_id/members — body `{ members: [{ identifier, role }] }`. */
+  addOrgMembers: async (
     orgId: string,
-    body: AddOrgMemberRequest
-  ): Promise<AddOrgMemberResponse> => {
-    const response = await apiService.post<AddOrgMemberApiResponse>(
+    body: AddOrgMembersRequest
+  ): Promise<AddOrgMembersResponse> => {
+    const response = await apiService.post<AddOrgMembersApiResponse>(
       `/api/v1/orgs/${encodeURIComponent(orgId)}/members`,
       {
-        identifier: body.identifier.trim(),
-        role: body.role,
+        members: body.members.map((m) => ({
+          identifier: m.identifier.trim(),
+          role: m.role,
+        })),
       }
     );
-    return mapAddOrgMemberResponse(response.data);
+    return mapAddOrgMembersResponse(response.data);
   },
 
   /** GET /api/v1/orgs/:org_id/members/search */

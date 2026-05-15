@@ -7,6 +7,6 @@ export default async function OrgProjectSlugIndexPage({
 }) {
   const { slug, projectSlug } = await params;
   redirect(
-    `/${encodeURIComponent(slug)}/projects/${encodeURIComponent(projectSlug)}/actors`
+    `/${encodeURIComponent(slug)}/projects/${encodeURIComponent(projectSlug)}/dashboard`
   );
 }

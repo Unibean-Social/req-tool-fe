@@ -1,13 +1,19 @@
 "use client";
 
 import { useMemo, type ReactNode } from "react";
-import { notFound, useParams } from "next/navigation";
+import { notFound, useParams, usePathname } from "next/navigation";
 
 import { Skeleton } from "@/components/ui/skeleton";
 import { useOrgMe } from "@/hooks/useOrg";
 import { useUserMe } from "@/hooks/useUser";
 import { useAppSelector } from "@/lib/redux/hooks";
 import { selectUser } from "@/lib/redux/slices/authSlice";
+
+import {
+  isOrgMembersWorkbenchPath,
+  isOrgProjectNewWizardPath,
+  isOrgProjectSlugWorkspacePath,
+} from "../components/orgWorkspacePaths";
 
 import {
   OrgWorkspaceContext,
@@ -29,9 +35,21 @@ function OrgWorkspaceLoading() {
 }
 
 function OrgWorkspaceChrome({ children }: { children: ReactNode }) {
+  const pathname = usePathname() ?? "";
+  const fullBleedMain =
+    isOrgProjectNewWizardPath(pathname) ||
+    isOrgProjectSlugWorkspacePath(pathname) ||
+    isOrgMembersWorkbenchPath(pathname);
+
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
-      <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden p-4 sm:p-6">
+      <main
+        className={
+          fullBleedMain
+            ? "flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden p-0"
+            : "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden p-4 sm:p-6"
+        }
+      >
         {children}
       </main>
     </div>
@@ -54,8 +72,7 @@ function OrgSlugWorkspace({
     [orgs, slug]
   );
 
-  const selfId =
-    user?.id?.trim() || meProfile?.id?.trim() || "";
+  const selfId = user?.id?.trim() || meProfile?.id?.trim() || "";
   const ownerOid = orgFromList?.ownerId?.trim() ?? "";
   const canManageOrgMembers = useMemo(
     () => Boolean(ownerOid) && Boolean(selfId) && selfId === ownerOid,

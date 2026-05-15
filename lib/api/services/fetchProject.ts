@@ -1,9 +1,16 @@
 import apiService from "../core";
 
-/** POST /api/v1/orgs/:org_id/projects */
+/** POST /api/v1/orgs/:org_id/projects — body JSON (snake_case trên wire). */
 export interface CreateOrgProjectRequest {
   name: string;
   description: string;
+  context: string;
+  problems: string;
+  stakeholders: string;
+  businessGoals: string;
+  businessFlows: string;
+  businessRules: string;
+  proposedSolutions: string;
 }
 
 /** PATCH /api/v1/orgs/:org_id/projects/:project_id */
@@ -18,7 +25,26 @@ interface OrgProjectRowApi {
   name: string;
   slug: string;
   description: string;
+  context?: string | null;
+  problems?: string | null;
+  stakeholders?: string | null;
+  business_goals?: string | null;
+  business_flows?: string | null;
+  business_rules?: string | null;
+  proposed_solutions?: string | null;
   created_at: string;
+}
+
+interface CreateOrgProjectApiBody {
+  name: string;
+  description: string;
+  context: string;
+  problems: string;
+  stakeholders: string;
+  business_goals: string;
+  business_flows: string;
+  business_rules: string;
+  proposed_solutions: string;
 }
 
 interface CreateOrgProjectApiResponse {
@@ -52,6 +78,13 @@ export interface OrgProject {
   name: string;
   slug: string;
   description: string;
+  context: string;
+  problems: string;
+  stakeholders: string;
+  businessGoals: string;
+  businessFlows: string;
+  businessRules: string;
+  proposedSolutions: string;
   createdAt: string;
 }
 
@@ -79,13 +112,40 @@ export interface UpdateOrgProjectResponse {
   message: string | null;
 }
 
+function trimField(s: string): string {
+  return s.trim();
+}
+
+function toCreateOrgProjectApiBody(
+  body: CreateOrgProjectRequest
+): CreateOrgProjectApiBody {
+  return {
+    name: trimField(body.name),
+    description: trimField(body.description),
+    context: trimField(body.context),
+    problems: trimField(body.problems),
+    stakeholders: trimField(body.stakeholders),
+    business_goals: trimField(body.businessGoals),
+    business_flows: trimField(body.businessFlows),
+    business_rules: trimField(body.businessRules),
+    proposed_solutions: trimField(body.proposedSolutions),
+  };
+}
+
 function mapOrgProjectRow(row: OrgProjectRowApi): OrgProject {
   return {
     id: row.id,
     orgId: row.org_id,
     name: row.name,
     slug: row.slug,
-    description: row.description,
+    description: row.description ?? "",
+    context: row.context ?? "",
+    problems: row.problems ?? "",
+    stakeholders: row.stakeholders ?? "",
+    businessGoals: row.business_goals ?? "",
+    businessFlows: row.business_flows ?? "",
+    businessRules: row.business_rules ?? "",
+    proposedSolutions: row.proposed_solutions ?? "",
     createdAt: row.created_at,
   };
 }
@@ -157,10 +217,7 @@ export const fetchProject = {
   ): Promise<CreateOrgProjectResponse> => {
     const response = await apiService.post<CreateOrgProjectApiResponse>(
       `/api/v1/orgs/${encodeURIComponent(orgId)}/projects`,
-      {
-        name: body.name.trim(),
-        description: body.description.trim(),
-      }
+      toCreateOrgProjectApiBody(body)
     );
     return mapCreateOrgProjectResponse(response.data);
   },

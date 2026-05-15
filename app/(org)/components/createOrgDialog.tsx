@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -16,6 +16,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useCreateOrg } from "@/hooks/useOrg";
 
+import { replaceOrgSlugInPathname } from "./orgWorkspacePaths";
+
 type CreateOrgDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -23,13 +25,15 @@ type CreateOrgDialogProps = {
 
 export function CreateOrgDialog({ open, onOpenChange }: CreateOrgDialogProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const [name, setName] = useState("");
 
   const createOrg = useCreateOrg({
     onSuccess: (res) => {
       onOpenChange(false);
       setName("");
-      router.push(`/${encodeURIComponent(res.data.slug)}/projects`);
+      const target = replaceOrgSlugInPathname(pathname ?? "", res.data.slug);
+      router.push(target);
     },
   });
 

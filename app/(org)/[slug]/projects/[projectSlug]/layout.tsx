@@ -6,6 +6,7 @@ import { notFound, useParams } from "next/navigation";
 import { useOrgProjects } from "@/hooks/useProject";
 
 import { useOrgWorkspace } from "../../orgWorkspaceContext";
+import { ProjectWorkspaceLayout } from "./components/projectWorkspaceLayout";
 
 export default function OrgProjectSlugLayout({
   children,
@@ -28,8 +29,9 @@ export default function OrgProjectSlugLayout({
     }
   }, [raw]);
 
-  const { orgId } = useOrgWorkspace();
-  const { data: projects, isPending, isError } = useOrgProjects(orgId);
+  const { orgId, slug: orgSlug } = useOrgWorkspace();
+  const { data: projects, isPending, isError, isFetching, isLoading } =
+    useOrgProjects(orgId);
 
   if (!projectSlug) {
     notFound();
@@ -39,12 +41,21 @@ export default function OrgProjectSlugLayout({
     notFound();
   }
 
-  if (!isPending) {
+  if (!isLoading && !isPending && !isFetching) {
     const exists = projects?.some((p) => p.slug === projectSlug) ?? false;
     if (!exists) {
       notFound();
     }
   }
 
-  return <>{children}</>;
+  return (
+    <ProjectWorkspaceLayout
+      orgSlug={orgSlug}
+      projectSlug={projectSlug}
+      projects={projects ?? []}
+      isProjectsPending={isPending}
+    >
+      {children}
+    </ProjectWorkspaceLayout>
+  );
 }

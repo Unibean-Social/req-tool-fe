@@ -1,20 +1,18 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "next/navigation";
 import * as React from "react";
 import { toast } from "sonner";
-import { setCookie } from "cookies-next";
-
 import { fetchGithub } from "@/lib/api/services/fetchGithub";
+import { persistAccessTokenCookie } from "@/lib/auth/refreshGithubSession";
+import { safeRedirectPath } from "@/lib/auth/session";
 import { queryKeys } from "@/lib/query/query-keys";
 import { useAppDispatch } from "@/lib/redux/hooks";
 import {
   setTokenWithRefresh,
   setupAutoRefresh,
 } from "@/lib/redux/slices/authSlice";
-import type { AppDispatch } from "@/lib/redux/store";
-import { getAuthCookieConfig } from "@/utils/cookieConfig";
+import { persistor, type AppDispatch } from "@/lib/redux/store";
 
 const DEFAULT_POPUP_FEATURES = "width=600,height=700,scrollbars=yes";
 const postLoginPath = process.env.NEXT_PUBLIC_POST_LOGIN_PATH ?? "/";
@@ -119,21 +117,35 @@ export function useGithubOAuth() {
 }
 
 
+function navigateAfterOAuthLogin(targetPath: string) {
+  /** Full reload để `proxy` nhận cookie `authToken` ngay (client `router.push` hay bị lệch). */
+  window.location.replace(targetPath);
+}
+
 export function useGithubOAuthPopupResult(
   redirectTo?: string,
   rememberMe = false
 ) {
   const dispatch = useAppDispatch();
-  const router = useRouter();
   const queryClient = useQueryClient();
+  const appOrigin = React.useMemo(
+    () => (typeof window !== "undefined" ? window.location.origin : ""),
+    []
+  );
   const apiOrigin = React.useMemo(
     () => new URL(fetchGithub.getOAuthUrl()).origin,
     []
   );
+  const postLoginTarget = React.useMemo(
+    () => safeRedirectPath(redirectTo ?? postLoginPath),
+    [redirectTo]
+  );
 
   React.useEffect(() => {
     function onMessage(event: MessageEvent) {
-      if (event.origin !== apiOrigin) {
+      const trustedOrigin =
+        event.origin === apiOrigin || (appOrigin && event.origin === appOrigin);
+      if (!trustedOrigin) {
         if (isDev) {
           /* Chỉ log khi có vẻ là payload OAuth (tránh spam từ extension) */
           const sample = unwrapMessageData(event.data);
@@ -178,19 +190,26 @@ export function useGithubOAuthPopupResult(
         return;
       }
 
-      setCookie(
-        "authToken",
-        tokens.accessToken,
-        getAuthCookieConfig(rememberMe)
-      );
+      persistAccessTokenCookie(tokens.accessToken, rememberMe);
       dispatch(setTokenWithRefresh(tokens));
       setupAutoRefresh(tokens.accessToken, dispatch as AppDispatch);
       void queryClient.invalidateQueries({ queryKey: queryKeys.auth.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.orgs.me() });
       toast.success("Đăng nhập GitHub thành công");
-      router.push(redirectTo ?? postLoginPath);
+
+      void persistor.flush().finally(() => {
+        navigateAfterOAuthLogin(postLoginTarget);
+      });
     }
 
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, [apiOrigin, dispatch, queryClient, redirectTo, rememberMe, router]);
+  }, [
+    apiOrigin,
+    appOrigin,
+    dispatch,
+    postLoginTarget,
+    queryClient,
+    rememberMe,
+  ]);
 }

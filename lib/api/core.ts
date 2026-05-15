@@ -2,6 +2,11 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from "axios";
 import { deleteCookie } from "cookies-next";
 
+import {
+  isGithubRefreshRequestUrl,
+  refreshGithubTokens,
+  persistAccessTokenCookie,
+} from "@/lib/auth/refreshGithubSession";
 import { buildLoginUrl } from "@/lib/auth/session";
 import { formatMessageFromValidationBody } from "@/lib/api/getApiErrorMessage";
 
@@ -62,8 +67,7 @@ class ApiService {
   }
 
   private isRefreshTokenRequest(config: AxiosRequestConfig | undefined): boolean {
-    const url = config?.url ?? "";
-    return url.includes("refresh-token");
+    return isGithubRefreshRequestUrl(config?.url);
   }
 
   private setupInterceptors() {
@@ -113,33 +117,24 @@ class ApiService {
           this.isRefreshing = true;
 
           try {
-            const response = await axios.post(
-              `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080/"}api/v1/auth/refresh-token`,
-              { refreshToken },
-              { headers: { "Content-Type": "application/json" } }
+            const tokens = await refreshGithubTokens(refreshToken);
+            persistAccessTokenCookie(tokens.accessToken);
+
+            const { setTokenWithRefresh, setupAutoRefresh } = await import(
+              "@/lib/redux/slices/authSlice"
             );
 
-            if (response.data?.data?.accessToken) {
-              const { accessToken, refreshToken: newRefreshToken } = response.data.data;
-
-              const { setTokenWithRefresh } = await import("@/lib/redux/slices/authSlice");
-              const { setCookie } = await import("cookies-next");
-              const { getAuthCookieConfig } = await import("@/utils/cookieConfig");
-
-              if (store) {
-                store.dispatch(setTokenWithRefresh({ accessToken, refreshToken: newRefreshToken }));
-              }
-              setCookie("authToken", accessToken, getAuthCookieConfig());
-              this.setAuthToken(accessToken);
-
-              this.processQueue(null, accessToken);
-              this.isRefreshing = false;
-
-              originalRequest.headers["Authorization"] = "Bearer " + accessToken;
-              return this.client(originalRequest);
+            if (store) {
+              store.dispatch(setTokenWithRefresh(tokens));
+              setupAutoRefresh(tokens.accessToken, store.dispatch);
             }
 
-            throw new Error("Invalid refresh response");
+            this.processQueue(null, tokens.accessToken);
+            this.isRefreshing = false;
+
+            originalRequest.headers["Authorization"] =
+              "Bearer " + tokens.accessToken;
+            return this.client(originalRequest);
           } catch (refreshError) {
             this.isRefreshing = false;
             this.processQueue(refreshError, null);

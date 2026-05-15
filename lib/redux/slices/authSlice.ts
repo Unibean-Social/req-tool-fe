@@ -1,9 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createSlice, createAsyncThunk, type PayloadAction } from "@reduxjs/toolkit";
-import { setCookie, deleteCookie } from "cookies-next";
 import { jwtDecode } from "jwt-decode";
 import apiService from "@/lib/api/core";
-import { getAuthCookieConfig } from "@/utils/cookieConfig";
+import {
+  clearAuthTokenCookies,
+  persistAccessTokenCookie,
+  refreshGithubTokens,
+} from "@/lib/auth/refreshGithubSession";
 import type { RootState, AppDispatch } from "../store";
 
 export interface User {
@@ -97,7 +100,7 @@ export const clearAutoRefresh = () => {
 };
 
 function clearAuthClientSession() {
-  deleteCookie("authToken", { path: "/" });
+  clearAuthTokenCookies();
   apiService.setAuthToken(null);
   clearAutoRefresh();
 }
@@ -119,26 +122,26 @@ export const refreshTokenAsync = createAsyncThunk(
       const { refreshToken } = state.auth;
       if (!refreshToken) return rejectWithValue("No refresh token");
 
-      const response = await apiService.post<{
-        isSuccess: boolean;
-        data: { accessToken: string; refreshToken: string };
-      }>("/api/v1/auth/refresh-token", { refreshToken });
+      const tokens = await refreshGithubTokens(refreshToken);
+      persistAccessTokenCookie(tokens.accessToken);
+      dispatch(
+        setTokenWithRefresh({
+          accessToken: tokens.accessToken,
+          refreshToken: tokens.refreshToken,
+        })
+      );
+      setupAutoRefresh(tokens.accessToken, dispatch as AppDispatch);
+      const user = decodeToken(tokens.accessToken);
 
-      if (response.data.isSuccess && response.data.data.accessToken) {
-        const { accessToken, refreshToken: newRefreshToken } = response.data.data;
-        const user = decodeToken(accessToken);
-
-        setCookie("authToken", accessToken, getAuthCookieConfig());
-        apiService.setAuthToken(accessToken);
-
-        setupAutoRefresh(accessToken, dispatch as AppDispatch);
-
-        return { token: accessToken, refreshToken: newRefreshToken, user };
-      }
-
-      return rejectWithValue("Refresh failed");
-    } catch (error: any) {
-      return rejectWithValue(error.message);
+      return {
+        token: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+        user,
+      };
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Refresh failed";
+      return rejectWithValue(message);
     }
   }
 );

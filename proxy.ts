@@ -1,7 +1,11 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
-const AUTH_COOKIE = "authToken";
+import {
+  AUTH_COOKIE,
+  isAuthTokenExpired,
+  safeRedirectPath,
+} from "@/lib/auth/session";
 
 function isPublicPath(pathname: string): boolean {
   if (pathname === "/login") return true;
@@ -9,24 +13,41 @@ function isPublicPath(pathname: string): boolean {
   return false;
 }
 
-function safeRedirectPath(from: string | null): string {
-  if (!from || !from.startsWith("/") || from.startsWith("//")) return "/";
-  return from;
+function redirectToLogin(
+  request: NextRequest,
+  fromPathname: string,
+  clearAuthCookie: boolean
+) {
+  const url = request.nextUrl.clone();
+  url.pathname = "/login";
+  url.search = "";
+  const from = safeRedirectPath(fromPathname);
+  if (from !== "/" && from !== "/login") {
+    url.searchParams.set("from", from);
+  }
+  const res = NextResponse.redirect(url);
+  if (clearAuthCookie) {
+    res.cookies.delete(AUTH_COOKIE);
+  }
+  return res;
 }
 
 /** Next.js 16+: `proxy` thay cho `middleware` (cùng Edge boundary, cookie redirect). */
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const token = request.cookies.get(AUTH_COOKIE)?.value;
+  const token = request.cookies.get(AUTH_COOKIE)?.value ?? "";
 
-  if (!token && !isPublicPath(pathname)) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    url.searchParams.set("from", pathname === "/" ? "/" : pathname);
-    return NextResponse.redirect(url);
+  const tokenValid = token.length > 0 && !isAuthTokenExpired(token);
+
+  if (token.length > 0 && !tokenValid) {
+    return redirectToLogin(request, pathname, true);
   }
 
-  if (token && pathname === "/login") {
+  if (!tokenValid && !isPublicPath(pathname)) {
+    return redirectToLogin(request, pathname, false);
+  }
+
+  if (tokenValid && pathname === "/login") {
     const from = safeRedirectPath(request.nextUrl.searchParams.get("from"));
     const url = request.nextUrl.clone();
     url.pathname = from;

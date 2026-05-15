@@ -364,7 +364,7 @@ function OrgMobileTabLink({
     <Link
       href={href}
       className={cn(
-        "flex min-w-[3.25rem] shrink-0 flex-col items-center gap-0.5 rounded-lg px-1.5 py-1 text-center text-[10px] font-semibold leading-tight transition-colors",
+        "flex min-w-13 shrink-0 flex-col items-center gap-0.5 rounded-lg px-1.5 py-1 text-center text-[10px] font-semibold leading-tight transition-colors",
         active
           ? "text-brand-mint"
           : "text-muted-foreground active:bg-muted/50"
@@ -374,7 +374,7 @@ function OrgMobileTabLink({
         className={cn("size-5 shrink-0", active && "text-brand-mint")}
         aria-hidden
       />
-      <span className="max-w-[4.5rem] leading-tight">{label}</span>
+      <span className="max-w-18 leading-tight">{label}</span>
       {active ? (
         <span className="h-0.75 w-6 shrink-0 rounded-full bg-chart-4" aria-hidden />
       ) : (
@@ -424,7 +424,7 @@ function OrgWorkspaceMobileBottomNav({
         <span className="text-[9px] font-medium text-muted-foreground">Trang chủ</span>
       </Link>
       {showOrgTabs && orgSlug ? (
-        <div className="flex min-w-0 flex-1 items-stretch justify-around gap-0.5 overflow-x-auto overscroll-x-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="flex min-w-0 flex-1 items-stretch justify-around gap-0.5 overflow-x-auto overscroll-x-contain [-ms-overflow-style:none] scrollbar-none [&::-webkit-scrollbar]:hidden">
           <OrgMobileTabLink
             href={`/${encodeURIComponent(orgSlug!)}/projects`}
             label="Dự án"

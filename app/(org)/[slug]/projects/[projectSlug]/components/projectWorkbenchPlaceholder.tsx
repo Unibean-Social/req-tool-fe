@@ -10,7 +10,7 @@ export function ProjectWorkbenchPlaceholder({
   icon: LucideIcon;
 }) {
   return (
-    <div className="mx-auto flex w-full max-w-lg flex-col gap-4 rounded-xl border border-border/70 bg-card/40 p-6 sm:p-8">
+    <div className="flex w-full flex-col">
       <div className="flex size-12 items-center justify-center rounded-xl bg-muted/80 text-primary">
         <Icon className="size-6" aria-hidden />
       </div>

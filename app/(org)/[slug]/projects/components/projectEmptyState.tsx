@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { ArrowUpRight, Plus } from "lucide-react";
 
-import { NotFound404Text } from "@/components/ui/404notFoundText";
 import { buttonVariants } from "@/components/ui/button";
 import { SafeImage } from "@/components/ui/safe-image";
 import { cn } from "@/lib/utils";
@@ -20,8 +19,6 @@ export function ProjectEmptyState({
   return (
     <div className="flex min-h-full w-full flex-1 flex-col items-center justify-center px-6 py-12 sm:px-8">
       <div className="flex w-full max-w-xl flex-col items-center text-center">
-        <NotFound404Text className="mb-1" />
-
         <SafeImage
           src="/notFound.svg"
           alt=""

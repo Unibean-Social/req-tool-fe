@@ -1,0 +1,45 @@
+---
+description: UI canvas card và sidebar detail cho mô hình yêu cầu (actors/[actorId])
+globs:
+  - app/**/actors/[actorId]/components/**
+  - app/**/actors/[actorId]/components/model/**
+  - app/**/actors/[actorId]/components/actor/**
+alwaysApply: false
+---
+
+# Requirements model — UI
+
+## Canvas card (React Flow node)
+
+- Nền card **tối cố định** (`bg-[#1a1d21]`), không đổi theo loại node.
+- **Viền theo loại luôn hiển thị** (`border-2`): xanh lá Actor · xanh dương Epic · tím Feature · xám Story; selected = cùng màu, sáng/đậm hơn.
+- Không dùng `ring-*` khi chọn; không phủ nền tint theo loại trên card.
+- Nội dung card: prefix, badge, title, section Action/Goal/AC — dùng `model/requirementWorkItemCard.tsx`.
+- Actor card: icon `PersonStanding` xanh lá, không badge; **không** mở panel chi tiết khi click.
+
+## Cạnh (React Flow)
+
+- Cạnh hợp lệ: `animated: true`, `smoothstep`, stroke xám trung tính, width 2.5 — xem `REQUIREMENT_EDGE_DEFAULT_OPTIONS` trong `model/requirementsModelConstants.ts`.
+
+## Sidebar detail (panel phải)
+
+- Layout **phẳng**: `bg-background`, `border-l`, không header dạng card, không sọc màu, không viền bọc từng khối form.
+- Header gọn: nhãn loại + title (preview) + nút đóng.
+- Form: `Label` + `Input` / `Select` / `Textarea` (shadcn), nhóm bằng tiêu đề section chữ nhỏ (`text-xs uppercase`), `space-y-4`.
+- Danh sách AC: hàng `flex` + checkbox + input, **không** bọc từng dòng trong card có border.
+- Footer: một nút Đóng (`variant="ghost"` hoặc `outline`), không banner CTA đậm.
+
+## Màu loại node (constants)
+
+Dùng cho viền card (mặc định + selected), dot palette, và nhãn — không dùng làm nền panel/detail.
+
+## Layout canvas
+
+- Cây **dọc** (trên → dưới): Actor → Epic → Feature → User Story; handle Top/Bottom.
+- Auto-layout: `layoutRequirementTree` trong `model/requirementsModelLayout.ts`.
+
+## Phạm vi trang (một `actorId`)
+
+- Route cố định một actor; canvas có **một** node Actor (không xóa, không kéo).
+- Palette chỉ tạo **Epic / Feature / User Story**; thả Epic tự nối `actorId → epic`.
+- Nối tay trên canvas: Epic → Feature → User Story (không nối tay actor → epic).

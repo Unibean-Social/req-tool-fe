@@ -97,12 +97,10 @@ function OrgMembersFlowInner({
   orgId,
   ownerId,
   members,
-  canManageMembers,
 }: {
   orgId: string;
   ownerId: string | null;
   members: OrgMember[];
-  canManageMembers: boolean;
 }) {
   const nodeTypes = useMemo(
     () => ({
@@ -151,7 +149,7 @@ function OrgMembersFlowInner({
       onNodesChange={onNodesChange}
       onNodeDragStop={onNodeDragStop}
       {...defaultReactFlowCanvasProps}
-      nodesDraggable={canManageMembers}
+      nodesDraggable
       className={cn(
         reactFlowCanvasClassName,
         "h-full min-h-0 [&_.react-flow__attribution]:hidden"
@@ -167,13 +165,11 @@ export function OrgMembersFlow({
   orgId,
   ownerId,
   members,
-  canManageMembers,
   className,
 }: {
   orgId: string;
   ownerId: string | null;
   members: OrgMember[];
-  canManageMembers: boolean;
   className?: string;
 }) {
   return (
@@ -189,7 +185,6 @@ export function OrgMembersFlow({
             orgId={orgId}
             ownerId={ownerId}
             members={members}
-            canManageMembers={canManageMembers}
           />
         </div>
       </ReactFlowProvider>
@@ -198,7 +193,7 @@ export function OrgMembersFlow({
 }
 
 export function Members() {
-  const { orgId, orgFromList, canManageOrgMembers } = useOrgWorkspace();
+  const { orgId, orgFromList } = useOrgWorkspace();
   const { data: members, isPending, isError, error, refetch } =
     useOrgMembers(orgId);
 
@@ -246,7 +241,6 @@ export function Members() {
           orgId={orgId}
           ownerId={orgFromList.ownerId}
           members={list}
-          canManageMembers={canManageOrgMembers}
           className="min-h-0 flex-1 rounded-l-none rounded-r-xl"
         />
         <OrgMembersSidePanel orgId={orgId} ownerId={orgFromList.ownerId} />

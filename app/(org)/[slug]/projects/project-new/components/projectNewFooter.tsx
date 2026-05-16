@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft } from "lucide-react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -36,67 +36,61 @@ export function ProjectNewFooter({
   return (
     <footer
       className={cn(
-        "shrink-0 border-t border-border/60 bg-background",
+        "shrink-0 border-t border-border/60 bg-background px-5 py-4 sm:px-8",
         className
       )}
     >
-      <div
-        className="h-1 w-full bg-muted"
-        role="progressbar"
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={progress}
-        aria-label="Tiến độ tạo dự án"
-      >
-        <div
-          className="h-full bg-primary transition-[width] duration-300 ease-out"
-          style={{ width: `${progress}%` }}
-        />
-      </div>
-      <div className="flex items-center justify-between gap-4 px-4 py-4 sm:px-6">
-        {canGoBack ? (
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0 flex-1 sm:max-w-xs">
+          <p className="text-sm font-medium text-foreground">
+            Bước {currentStepIndex + 1} / {totalSteps}
+          </p>
+          <div
+            className="mt-2 h-1 w-full overflow-hidden rounded-full bg-muted"
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={progress}
+            aria-label="Tiến độ tạo dự án"
+          >
+            <div
+              className="h-full rounded-full bg-primary transition-[width] duration-300 ease-out"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+        </div>
+
+        <div className="flex shrink-0 items-center justify-end gap-3">
+          {canGoBack ? (
+            <Button
+              type="button"
+              variant="outline"
+              className="gap-2 border-border/90 font-medium"
+              onClick={onBack}
+            >
+              <ArrowLeft className="size-4" aria-hidden />
+              Quay lại
+            </Button>
+          ) : null}
           <Button
             type="button"
-            variant="ghost"
-            className="gap-1.5 px-2 text-muted-foreground hover:text-foreground"
-            onClick={onBack}
+            variant="default"
+            disabled={nextDisabled || nextLoading}
+            onClick={onNext}
+            className="gap-2 font-semibold"
           >
-            <ChevronLeft className="size-4" aria-hidden />
-            Quay lại
+            {nextLoading ? (
+              "Đang tạo…"
+            ) : isLastStep ? (
+              "Tạo dự án"
+            ) : (
+              <>
+                Tiếp theo
+                <ArrowRight className="size-4" aria-hidden />
+              </>
+            )}
           </Button>
-        ) : (
-          <span className="min-w-[6rem]" aria-hidden />
-        )}
-        <Button
-          type="button"
-          variant="default"
-          disabled={nextDisabled || nextLoading}
-          onClick={onNext}
-          className={cn(
-            "rounded-full px-8 py-2.5 font-semibold shadow-md",
-            "disabled:opacity-50"
-          )}
-        >
-          {nextLoading ? (
-            "Đang tạo…"
-          ) : isLastStep ? (
-            <>
-              Tạo dự án
-              <span
-                className="ml-1 inline-block size-2 shrink-0 rounded-full bg-primary-foreground opacity-90"
-                aria-hidden
-              />
-            </>
-          ) : (
-            <>
-              Tiếp theo
-              <span
-                className="ml-1 inline-block size-2 shrink-0 rounded-full bg-primary-foreground opacity-90"
-                aria-hidden
-              />
-            </>
-          )}
-        </Button>
+        </div>
       </div>
     </footer>
   );

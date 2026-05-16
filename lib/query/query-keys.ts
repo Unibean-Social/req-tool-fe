@@ -14,6 +14,13 @@ export function orgProjectQueryKey(orgId: string, projectId: string) {
   return [...ORG_ROOT, "projects", orgId, projectId] as const;
 }
 
+const PROJECTS_ROOT = ["projects"] as const;
+
+/** Key danh sách actors theo `project_id` (GET / POST invalidate). */
+export function projectActorsQueryKey(projectId: string) {
+  return [...PROJECTS_ROOT, "actors", projectId] as const;
+}
+
 /** Namespace org — `satisfies` buộc đủ key. */
 type OrgQueryKeys = {
   readonly all: typeof ORG_ROOT;
@@ -60,6 +67,10 @@ export const queryKeys = {
     projects: orgProjectsQueryKey,
     project: orgProjectQueryKey,
   } satisfies OrgQueryKeys,
+  projects: {
+    all: PROJECTS_ROOT,
+    actors: projectActorsQueryKey,
+  },
   users: {
     all: ["users"] as const,
     me: () => [...queryKeys.users.all, "me"] as const,

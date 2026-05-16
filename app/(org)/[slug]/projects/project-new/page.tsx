@@ -1,34 +1,40 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { cn } from "@/lib/utils";
 import type { CreateOrgProjectRequest } from "@/lib/api/services/fetchProject";
 import { useCreateOrgProject } from "@/hooks/useProject";
 
 import { useOrgWorkspace } from "../../orgWorkspaceContext";
 import { ProjectNewFooter } from "./components/projectNewFooter";
-import { ProjectNewHeader } from "./components/projectNewHeader";
+import { ProjectNewPageToolbar } from "./components/projectNewPageToolbar";
 import { ProjectNewPreviewDialog } from "./components/projectNewPreviewDialog";
+import { ProjectNewSidebar } from "./components/projectNewSidebar";
+import { PROJECT_NEW_TOTAL_STEPS } from "./components/projectNewSteps";
+import {
+  isProjectNewFormValid,
+  isProjectNewStepValid,
+  validateProjectNewStep,
+} from "./components/projectNewFormSchema";
 import { ProjectNewStepBasics } from "./components/steps/projectNewStepBasics";
 import { ProjectNewStepContext } from "./components/steps/projectNewStepContext";
 import { ProjectNewStepFlowsRules } from "./components/steps/projectNewStepFlowsRules";
 import { ProjectNewStepSolution } from "./components/steps/projectNewStepSolution";
 import { ProjectNewStepStakeholders } from "./components/steps/projectNewStepStakeholders";
 
-const TOTAL_STEPS = 5;
-
 function emptyCreateProjectForm(): CreateOrgProjectRequest {
   return {
     name: "",
     description: "",
     context: "",
-    problems: "",
-    stakeholders: "",
-    businessGoals: "",
-    businessFlows: "",
-    businessRules: "",
-    proposedSolutions: "",
+    problems: [],
+    stakeholders: [],
+    businessGoals: [],
+    businessFlows: [],
+    businessRules: [],
+    proposedSolutions: [],
   };
 }
 
@@ -41,6 +47,12 @@ export default function OrgProjectNewPage() {
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<CreateOrgProjectRequest>(emptyCreateProjectForm);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [showSubmitErrors, setShowSubmitErrors] = useState(false);
+
+  const stepErrors = useMemo(
+    () => validateProjectNewStep(step, form).errors,
+    [step, form]
+  );
 
   const createProject = useCreateOrgProject({
     onSuccess: (res) => {
@@ -58,25 +70,42 @@ export default function OrgProjectNewPage() {
     router.replace(projectsBase);
   }, [router, projectsBase]);
 
-  const nameOk = form.name.trim().length > 0;
-  const isLast = step === TOTAL_STEPS - 1;
+  const isFillHeightStep = step === 0 || step === 1 || step === 2;
+  const isLast = step === PROJECT_NEW_TOTAL_STEPS - 1;
+  const stepValid = isProjectNewStepValid(step, form);
+  const formValid = isProjectNewFormValid(form);
   const nextDisabled = isLast
-    ? !nameOk || createProject.isPending
-    : step === 0
-      ? !nameOk
-      : false;
+    ? !formValid || createProject.isPending
+    : !stepValid || createProject.isPending;
+
+  const goToStep = useCallback((next: number) => {
+    setShowSubmitErrors(false);
+    setStep(next);
+  }, []);
 
   const handleNext = () => {
+    const validation = validateProjectNewStep(step, form);
+    if (!validation.success) {
+      setShowSubmitErrors(true);
+      return;
+    }
     if (isLast) {
-      if (!nameOk || createProject.isPending) return;
+      if (!formValid || createProject.isPending) return;
       createProject.mutate({ orgId, body: form });
       return;
     }
-    setStep((s) => Math.min(TOTAL_STEPS - 1, s + 1));
+    setShowSubmitErrors(false);
+    setStep((s) => Math.min(PROJECT_NEW_TOTAL_STEPS - 1, s + 1));
   };
 
   const handleBack = () => {
+    setShowSubmitErrors(false);
     setStep((s) => Math.max(0, s - 1));
+  };
+
+  const stepValidationProps = {
+    showSubmitErrors,
+    errors: stepErrors,
   };
 
   const stepContent = (() => {
@@ -87,6 +116,7 @@ export default function OrgProjectNewPage() {
             form={form}
             onPatch={patchForm}
             disabled={createProject.isPending}
+            {...stepValidationProps}
           />
         );
       case 1:
@@ -95,6 +125,7 @@ export default function OrgProjectNewPage() {
             form={form}
             onPatch={patchForm}
             disabled={createProject.isPending}
+            {...stepValidationProps}
           />
         );
       case 2:
@@ -103,6 +134,7 @@ export default function OrgProjectNewPage() {
             form={form}
             onPatch={patchForm}
             disabled={createProject.isPending}
+            {...stepValidationProps}
           />
         );
       case 3:
@@ -111,6 +143,7 @@ export default function OrgProjectNewPage() {
             form={form}
             onPatch={patchForm}
             disabled={createProject.isPending}
+            {...stepValidationProps}
           />
         );
       case 4:
@@ -119,6 +152,7 @@ export default function OrgProjectNewPage() {
             form={form}
             onPatch={patchForm}
             disabled={createProject.isPending}
+            {...stepValidationProps}
           />
         );
       default:
@@ -127,25 +161,50 @@ export default function OrgProjectNewPage() {
   })();
 
   return (
-    <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-background">
-      <ProjectNewHeader
+    <div className="flex h-full min-h-0 flex-1 overflow-hidden bg-background">
+      <ProjectNewSidebar
+        className="hidden lg:flex"
         projectsHref={projectsBase}
-        onPreview={() => setPreviewOpen(true)}
-        onExit={exitWizard}
-      />
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-8 sm:px-8 sm:py-10">
-        {stepContent}
-      </div>
-      <ProjectNewFooter
         currentStepIndex={step}
-        totalSteps={TOTAL_STEPS}
-        canGoBack={step > 0}
-        onBack={handleBack}
-        isLastStep={isLast}
-        nextDisabled={nextDisabled}
-        nextLoading={createProject.isPending}
-        onNext={handleNext}
+        onStepSelect={goToStep}
       />
+
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <ProjectNewPageToolbar
+          currentStepIndex={step}
+          onPreview={() => setPreviewOpen(true)}
+          onExit={exitWizard}
+        />
+
+        <div
+          className={cn(
+            isFillHeightStep
+              ? "flex min-h-0 flex-1 flex-col overflow-hidden px-5 pb-4 sm:px-8 sm:pb-5 lg:px-10 lg:pb-6"
+              : "min-h-0 flex-1 overflow-y-auto px-6 pb-8 sm:px-10 sm:pb-10 lg:px-14 lg:pb-12"
+          )}
+        >
+          <div
+            className={cn(
+              "w-full max-w-5xl mx-auto",
+              isFillHeightStep && "flex min-h-0 flex-1 flex-col"
+            )}
+          >
+            {stepContent}
+          </div>
+        </div>
+
+        <ProjectNewFooter
+          currentStepIndex={step}
+          totalSteps={PROJECT_NEW_TOTAL_STEPS}
+          canGoBack={step > 0}
+          onBack={handleBack}
+          isLastStep={isLast}
+          nextDisabled={nextDisabled}
+          nextLoading={createProject.isPending}
+          onNext={handleNext}
+        />
+      </div>
+
       <ProjectNewPreviewDialog
         open={previewOpen}
         onOpenChange={setPreviewOpen}

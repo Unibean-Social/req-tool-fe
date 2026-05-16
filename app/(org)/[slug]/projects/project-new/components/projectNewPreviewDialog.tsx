@@ -13,17 +13,22 @@ import type { CreateOrgProjectRequest } from "@/lib/api/services/fetchProject";
 const PREVIEW_ROWS: {
   key: keyof CreateOrgProjectRequest;
   label: string;
+  isList?: boolean;
 }[] = [
   { key: "name", label: "Tên dự án" },
   { key: "description", label: "Mô tả" },
   { key: "context", label: "Ngữ cảnh" },
-  { key: "problems", label: "Vấn đề" },
-  { key: "stakeholders", label: "Bên liên quan" },
-  { key: "businessGoals", label: "Mục tiêu kinh doanh" },
-  { key: "businessFlows", label: "Luồng nghiệp vụ" },
-  { key: "businessRules", label: "Quy tắc nghiệp vụ" },
-  { key: "proposedSolutions", label: "Đề xuất giải pháp" },
+  { key: "problems", label: "Vấn đề", isList: true },
+  { key: "stakeholders", label: "Bên liên quan", isList: true },
+  { key: "businessGoals", label: "Mục tiêu kinh doanh", isList: true },
+  { key: "businessFlows", label: "Luồng nghiệp vụ", isList: true },
+  { key: "businessRules", label: "Quy tắc nghiệp vụ", isList: true },
+  { key: "proposedSolutions", label: "Đề xuất giải pháp", isList: true },
 ];
+
+function previewListItems(items: string[]): string[] {
+  return items.map((s) => s.trim()).filter(Boolean);
+}
 
 export function ProjectNewPreviewDialog({
   open,
@@ -45,13 +50,38 @@ export function ProjectNewPreviewDialog({
         </DialogHeader>
         <ScrollArea className="max-h-[min(60vh,24rem)] pr-3">
           <dl className="grid gap-4 text-sm">
-            {PREVIEW_ROWS.map(({ key, label }) => {
-              const value = form[key]?.trim() || "—";
+            {PREVIEW_ROWS.map(({ key, label, isList }) => {
+              const raw = form[key];
               return (
                 <div key={key} className="min-w-0">
                   <dt className="font-semibold text-foreground">{label}</dt>
-                  <dd className="mt-1 whitespace-pre-wrap wrap-break-word text-muted-foreground">
-                    {value}
+                  <dd className="mt-1 text-muted-foreground">
+                    {isList ? (
+                      (() => {
+                        const items = previewListItems(
+                          raw as string[]
+                        );
+                        if (!items.length) {
+                          return <span>—</span>;
+                        }
+                        return (
+                          <ul className="list-disc space-y-1 pl-4">
+                            {items.map((item, i) => (
+                              <li
+                                key={`${key}-${i}`}
+                                className="wrap-break-word whitespace-pre-wrap"
+                              >
+                                {item}
+                              </li>
+                            ))}
+                          </ul>
+                        );
+                      })()
+                    ) : (
+                      <span className="whitespace-pre-wrap wrap-break-word">
+                        {(raw as string).trim() || "—"}
+                      </span>
+                    )}
                   </dd>
                 </div>
               );

@@ -10,11 +10,14 @@ import { toast } from "sonner";
 import { useCachedGet } from "@/hooks/useCachedGet";
 import { getApiErrorMessage } from "@/lib/api/getApiErrorMessage";
 import { fetchProject } from "@/lib/api/services/fetchProject";
+import { getNextProjectSlugAfterDelete } from "@/lib/project/projectListNav";
 import { orgProjectQueryKey, orgProjectsQueryKey } from "@/lib/query/query-keys";
 
 import type {
   CreateOrgProjectRequest,
   CreateOrgProjectResponse,
+  GetOrgProjectParams,
+  ListOrgProjectsParams,
   OrgProject,
   OrgProjectDetailResponse,
   OrgProjectsListResponse,
@@ -35,8 +38,14 @@ type UpdateOrgProjectVariables = {
 
 type DeleteOrgProjectVariables = { orgId: string; projectId: string };
 
+export type DeleteOrgProjectMutationContext = {
+  previousList: OrgProjectsListResponse | undefined;
+  nextSlug: string | null;
+};
+
 /**
- * GET /api/v1/orgs/:org_id/projects — `orgId` rỗng thì `enabled: false`.
+ * GET /api/v1/orgs/{org_id}/projects — danh sách dự án (đủ field: context, problems, …).
+ * `orgId` rỗng thì `enabled: false`.
  */
 export function useOrgProjects(
   orgId: string | null | undefined,
@@ -47,12 +56,13 @@ export function useOrgProjects(
 
   return useCachedGet<OrgProjectsListResponse, Error, OrgProject[]>({
     queryKey: orgProjectsQueryKey(id),
-    queryFn: async () => fetchProject.listOrgProjects(id),
+    queryFn: async () => fetchProject.listOrgProjects({ orgId: id }),
     select: (res) => res.data,
     enabled,
   });
 }
 
+/** Cùng GET list; trả full envelope `{ success, data, message }`. */
 export function useOrgProjectsFull(
   orgId: string | null | undefined,
   options?: { enabled?: boolean }
@@ -62,49 +72,84 @@ export function useOrgProjectsFull(
 
   return useCachedGet({
     queryKey: orgProjectsQueryKey(id),
-    queryFn: () => fetchProject.listOrgProjects(id),
+    queryFn: () => fetchProject.listOrgProjects({ orgId: id }),
     enabled,
   });
 }
 
+type UseOrgProjectArg =
+  | string
+  | null
+  | undefined
+  | GetOrgProjectParams
+  | { orgId: string | null | undefined; projectId: string | null | undefined };
+
+function resolveUseOrgProjectIds(
+  orgIdOrParams: UseOrgProjectArg,
+  projectIdArg?: string | null | undefined
+): GetOrgProjectParams | null {
+  if (orgIdOrParams && typeof orgIdOrParams === "object") {
+    if ("projectId" in orgIdOrParams && "orgId" in orgIdOrParams) {
+      const orgId = orgIdOrParams.orgId?.trim() ?? "";
+      const projectId = orgIdOrParams.projectId?.trim() ?? "";
+      if (!orgId || !projectId) return null;
+      return { orgId, projectId };
+    }
+  }
+  const orgId =
+    typeof orgIdOrParams === "string" ? orgIdOrParams.trim() : "";
+  const projectId = projectIdArg?.trim() ?? "";
+  if (!orgId || !projectId) return null;
+  return { orgId, projectId };
+}
+
 /**
- * GET /api/v1/orgs/:org_id/projects/:project_id — thiếu id thì `enabled: false`.
+ * GET /api/v1/orgs/{org_id}/projects/{project_id} — thiếu `org_id` / `project_id` thì `enabled: false`.
  */
 export function useOrgProject(
-  orgId: string | null | undefined,
-  projectId: string | null | undefined,
+  orgIdOrParams: UseOrgProjectArg,
+  projectId?: string | null | undefined,
   options?: { enabled?: boolean }
 ) {
-  const oid = orgId?.trim() ?? "";
-  const pid = projectId?.trim() ?? "";
-  const enabled = Boolean(oid && pid) && (options?.enabled ?? true);
+  const ids = resolveUseOrgProjectIds(orgIdOrParams, projectId);
+  const enabled = Boolean(ids) && (options?.enabled ?? true);
 
   return useCachedGet<OrgProjectDetailResponse, Error, OrgProject>({
-    queryKey: orgProjectQueryKey(oid, pid),
-    queryFn: async () => fetchProject.getOrgProject(oid, pid),
+    queryKey: orgProjectQueryKey(ids?.orgId ?? "", ids?.projectId ?? ""),
+    queryFn: async () =>
+      fetchProject.getOrgProject({
+        orgId: ids!.orgId,
+        projectId: ids!.projectId,
+      }),
     select: (res) => res.data,
     enabled,
   });
 }
 
+/** Cùng GET detail; trả full envelope `{ success, data, message }`. */
 export function useOrgProjectFull(
-  orgId: string | null | undefined,
-  projectId: string | null | undefined,
+  orgIdOrParams: UseOrgProjectArg,
+  projectId?: string | null | undefined,
   options?: { enabled?: boolean }
 ) {
-  const oid = orgId?.trim() ?? "";
-  const pid = projectId?.trim() ?? "";
-  const enabled = Boolean(oid && pid) && (options?.enabled ?? true);
+  const ids = resolveUseOrgProjectIds(orgIdOrParams, projectId);
+  const enabled = Boolean(ids) && (options?.enabled ?? true);
 
   return useCachedGet({
-    queryKey: orgProjectQueryKey(oid, pid),
-    queryFn: () => fetchProject.getOrgProject(oid, pid),
+    queryKey: orgProjectQueryKey(ids?.orgId ?? "", ids?.projectId ?? ""),
+    queryFn: () =>
+      fetchProject.getOrgProject({
+        orgId: ids!.orgId,
+        projectId: ids!.projectId,
+      }),
     enabled,
   });
 }
 
 /**
- * POST /api/v1/orgs/:org_id/projects — invalidate danh sách dự án theo org.
+ * POST /api/v1/orgs/:org_id/projects
+ * Body: name, description, context + các trường danh sách (problems, stakeholders, …).
+ * Invalidate danh sách dự án theo org sau khi tạo.
  */
 export function useCreateOrgProject(
   options?: Omit<
@@ -215,12 +260,17 @@ export function useUpdateOrgProject(
  */
 export function useDeleteOrgProject(
   options?: Omit<
-    UseMutationOptions<void, Error, DeleteOrgProjectVariables>,
+    UseMutationOptions<
+      void,
+      Error,
+      DeleteOrgProjectVariables,
+      DeleteOrgProjectMutationContext
+    >,
     "mutationFn"
   >
 ) {
   const queryClient = useQueryClient();
-  const { onSuccess: userOnSuccess, onError: userOnError, ...rest } =
+  const { onSuccess: userOnSuccess, onError: userOnError, onMutate: userOnMutate, ...rest } =
     options ?? {};
 
   return useMutation({
@@ -231,7 +281,32 @@ export function useDeleteOrgProject(
     }: DeleteOrgProjectVariables): Promise<void> => {
       await fetchProject.deleteOrgProject(orgId, projectId);
     },
-    onSuccess: (data, variables, onMutateResult, context) => {
+    onMutate: async (variables) => {
+      const listKey = orgProjectsQueryKey(variables.orgId);
+      await queryClient.cancelQueries({ queryKey: listKey });
+
+      const previousList =
+        queryClient.getQueryData<OrgProjectsListResponse>(listKey);
+      const list = previousList?.data ?? [];
+      const nextSlug = getNextProjectSlugAfterDelete(
+        list,
+        variables.projectId
+      );
+
+      if (previousList?.data) {
+        queryClient.setQueryData<OrgProjectsListResponse>(listKey, {
+          ...previousList,
+          data: previousList.data.filter(
+            (p) => p.id !== variables.projectId
+          ),
+        });
+      }
+
+      await userOnMutate?.(variables, undefined as never);
+      return { previousList, nextSlug };
+    },
+    onSuccess: (data, variables, mutateContext, mutationContext) => {
+      userOnSuccess?.(data, variables, mutateContext, mutationContext);
       void queryClient.removeQueries({
         queryKey: orgProjectQueryKey(variables.orgId, variables.projectId),
       });
@@ -239,11 +314,16 @@ export function useDeleteOrgProject(
         queryKey: orgProjectsQueryKey(variables.orgId),
       });
       toast.success("Đã xóa dự án");
-      userOnSuccess?.(data, variables, onMutateResult, context);
     },
-    onError: (error, variables, onMutateResult, context) => {
+    onError: (error, variables, mutateContext, mutationContext) => {
+      if (mutateContext?.previousList) {
+        queryClient.setQueryData(
+          orgProjectsQueryKey(variables.orgId),
+          mutateContext.previousList
+        );
+      }
       toast.error(getApiErrorMessage(error, "Xóa dự án thất bại"));
-      userOnError?.(error, variables, onMutateResult, context);
+      userOnError?.(error, variables, mutateContext, mutationContext);
     },
   });
 }
@@ -251,7 +331,10 @@ export function useDeleteOrgProject(
 export type {
   CreateOrgProjectRequest,
   CreateOrgProjectResponse,
+  GetOrgProjectParams,
+  ListOrgProjectsParams,
   OrgProject,
+  OrgProjectApiRow,
   OrgProjectDetailResponse,
   OrgProjectsListResponse,
   UpdateOrgProjectRequest,

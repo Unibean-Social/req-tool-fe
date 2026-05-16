@@ -2,15 +2,27 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useCallback, useEffect } from "react";
 import { LayoutGroup, motion } from "framer-motion";
 import { Plus } from "lucide-react";
 
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type { OrgProject } from "@/lib/api/services/fetchProject";
 import { cn } from "@/lib/utils";
 
 import { ProjectWorkspaceNavSidebar } from "./projectWorkspaceNavSidebar";
+import {
+  getNextProjectSlugAfterDelete,
+  getRedirectSlugWhenCurrentMissing,
+  projectSubPathFromPathname,
+} from "./projectWorkspaceNav";
+import { ProjectWorkspaceNavProvider } from "./projectWorkspaceNavContext";
 
 const PROJECT_RAIL_GRADIENTS = [
   "from-orange-400 to-rose-600",
@@ -39,18 +51,17 @@ function projectRailGradient(seed: string): string {
   return PROJECT_RAIL_GRADIENTS[h % PROJECT_RAIL_GRADIENTS.length]!;
 }
 
-function projectInitial(name: string): string {
+/** 2 ký tự: từ đầu + cuối nếu nhiều từ; ngược lại 2 ký tự đầu (giống nameToInitials org). */
+function projectInitials(name: string): string {
   const t = name.trim();
   if (!t) return "?";
-  return t.charAt(0).toLocaleUpperCase("vi-VN");
-}
-
-/** Giữ tab hiện tại khi đổi dự án trên rail 1. */
-function projectSubPathFromPathname(pathname: string, base: string): string {
-  if (!pathname.startsWith(base)) return "dashboard";
-  const rest = pathname.slice(base.length).replace(/^\//, "");
-  const segment = rest.split("/")[0];
-  return segment || "dashboard";
+  const parts = t.split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) {
+    const first = parts[0]![0] ?? "";
+    const last = parts[parts.length - 1]![0] ?? "";
+    return `${first}${last}`.toLocaleUpperCase("vi-VN");
+  }
+  return t.slice(0, Math.min(2, t.length)).toLocaleUpperCase("vi-VN");
 }
 
 function DiscordRailItem({
@@ -84,20 +95,29 @@ function DiscordRailItem({
           )}
         />
       )}
-      <Link
-        href={href}
-        title={title}
-        aria-current={active ? "page" : undefined}
-        className={cn(
-          RAIL_ICON_MOTION,
-          "relative flex size-12 shrink-0 scale-100 items-center justify-center overflow-hidden rounded-full text-sm font-bold text-white shadow-md outline-none active:scale-[0.96] focus-visible:ring-2 focus-visible:ring-ring/50",
-          "hover:scale-[1.06] hover:rounded-2xl",
-          active && "scale-[1.04] rounded-2xl",
-          className
-        )}
-      >
-        {children}
-      </Link>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Link
+              href={href}
+              aria-label={title}
+              aria-current={active ? "page" : undefined}
+              className={cn(
+                RAIL_ICON_MOTION,
+                "relative flex size-12 shrink-0 scale-100 items-center justify-center overflow-hidden rounded-full text-lg font-bold leading-none tracking-tight text-white shadow-md outline-none active:scale-[0.96] focus-visible:ring-2 focus-visible:ring-ring/50",
+                "hover:scale-[1.06] hover:rounded-2xl",
+                active && "scale-[1.04] rounded-2xl",
+                className
+              )}
+            >
+              {children}
+            </Link>
+          }
+        />
+        <TooltipContent side="right" sideOffset={10} align="center">
+          {title}
+        </TooltipContent>
+      </Tooltip>
     </div>
   );
 }
@@ -115,6 +135,7 @@ export function ProjectWorkspaceLayout({
   isProjectsPending: boolean;
   children: React.ReactNode;
 }) {
+  const router = useRouter();
   const pathname = usePathname() ?? "";
   const encOrg = encodeURIComponent(orgSlug);
   const encProj = encodeURIComponent(projectSlug);
@@ -123,8 +144,56 @@ export function ProjectWorkspaceLayout({
   const currentSubPath = projectSubPathFromPathname(pathname, base);
   const isMembersView =
     pathname === `${base}/members` || pathname === `${base}/members/`;
+  const currentProject = projects.find((p) => p.slug === projectSlug);
+  const projectId = currentProject?.id ?? null;
+
+  const navigateAfterProjectDelete = useCallback(
+    (deletedProjectId: string, nextSlugOverride?: string | null) => {
+      const subPath = projectSubPathFromPathname(pathname, base);
+      const nextSlug =
+        nextSlugOverride ??
+        getNextProjectSlugAfterDelete(projects, deletedProjectId);
+      if (nextSlug) {
+        router.replace(
+          `/${encOrg}/projects/${encodeURIComponent(nextSlug)}/${subPath}`
+        );
+        return;
+      }
+      router.replace(`/${encOrg}/projects`);
+    },
+    [base, encOrg, pathname, projects, router]
+  );
+
+  useEffect(() => {
+    if (isProjectsPending) return;
+    if (projects.some((p) => p.slug === projectSlug)) return;
+
+    const subPath = projectSubPathFromPathname(pathname, base);
+    const redirectSlug = getRedirectSlugWhenCurrentMissing(
+      projects,
+      projectSlug
+    );
+
+    if (!redirectSlug) {
+      router.replace(`/${encOrg}/projects`);
+      return;
+    }
+
+    router.replace(
+      `/${encOrg}/projects/${encodeURIComponent(redirectSlug)}/${subPath}`
+    );
+  }, [
+    base,
+    encOrg,
+    isProjectsPending,
+    pathname,
+    projectSlug,
+    projects,
+    router,
+  ]);
 
   return (
+    <ProjectWorkspaceNavProvider value={{ navigateAfterProjectDelete }}>
     <div className="flex h-full min-h-0 w-full flex-1 flex-row overflow-hidden bg-background">
       {/* Rail 1 — danh sách dự án (kiểu Discord) */}
       <aside
@@ -170,7 +239,7 @@ export function ProjectWorkspaceLayout({
                       projectRailGradient(p.id)
                     )}
                   >
-                    {projectInitial(p.name)}
+                    {projectInitials(p.name)}
                   </DiscordRailItem>
                 );
               })}
@@ -196,7 +265,12 @@ export function ProjectWorkspaceLayout({
         </Link>
       </aside>
 
-      <ProjectWorkspaceNavSidebar orgSlug={orgSlug} projectSlug={projectSlug} />
+      <ProjectWorkspaceNavSidebar
+        orgSlug={orgSlug}
+        projectSlug={projectSlug}
+        projectId={projectId}
+        projectsLoaded={!isProjectsPending}
+      />
 
       <main
         className={cn(
@@ -207,5 +281,6 @@ export function ProjectWorkspaceLayout({
         {children}
       </main>
     </div>
+    </ProjectWorkspaceNavProvider>
   );
 }

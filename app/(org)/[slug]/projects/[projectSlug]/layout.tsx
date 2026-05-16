@@ -1,9 +1,13 @@
 "use client";
 
-import { type ReactNode, useMemo } from "react";
-import { notFound, useParams } from "next/navigation";
+import { type ReactNode, useLayoutEffect, useMemo } from "react";
+import { notFound, useParams, usePathname, useRouter } from "next/navigation";
 
 import { useOrgProjects } from "@/hooks/useProject";
+import {
+  getRedirectSlugWhenCurrentMissing,
+  projectSubPathFromPathname,
+} from "@/lib/project/projectListNav";
 
 import { useOrgWorkspace } from "../../orgWorkspaceContext";
 import { ProjectWorkspaceLayout } from "./components/projectWorkspaceLayout";
@@ -14,6 +18,8 @@ export default function OrgProjectSlugLayout({
   children: ReactNode;
 }) {
   const params = useParams();
+  const router = useRouter();
+  const pathname = usePathname() ?? "";
   const raw = params?.projectSlug;
   const projectSlug = useMemo(() => {
     const s =
@@ -33,6 +39,39 @@ export default function OrgProjectSlugLayout({
   const { data: projects, isPending, isError, isFetching, isLoading } =
     useOrgProjects(orgId);
 
+  const projectsList = projects ?? [];
+  const projectsReady = !isLoading && !isPending && !isFetching;
+  const projectExists = projectsList.some((p) => p.slug === projectSlug);
+
+  useLayoutEffect(() => {
+    if (!projectsReady || projectExists || !projectSlug) return;
+
+    const encOrg = encodeURIComponent(orgSlug);
+    const redirectSlug = getRedirectSlugWhenCurrentMissing(
+      projectsList,
+      projectSlug
+    );
+
+    if (!redirectSlug) {
+      router.replace(`/${encOrg}/projects`);
+      return;
+    }
+
+    const base = `/${encOrg}/projects/${encodeURIComponent(projectSlug)}`;
+    const subPath = projectSubPathFromPathname(pathname, base);
+    router.replace(
+      `/${encOrg}/projects/${encodeURIComponent(redirectSlug)}/${subPath}`
+    );
+  }, [
+    orgSlug,
+    pathname,
+    projectExists,
+    projectSlug,
+    projectsList,
+    projectsReady,
+    router,
+  ]);
+
   if (!projectSlug) {
     notFound();
   }
@@ -41,18 +80,24 @@ export default function OrgProjectSlugLayout({
     notFound();
   }
 
-  if (!isLoading && !isPending && !isFetching) {
-    const exists = projects?.some((p) => p.slug === projectSlug) ?? false;
-    if (!exists) {
-      notFound();
-    }
+  if (projectsReady && !projectExists) {
+    return (
+      <ProjectWorkspaceLayout
+        orgSlug={orgSlug}
+        projectSlug={projectSlug}
+        projects={projectsList}
+        isProjectsPending
+      >
+        {null}
+      </ProjectWorkspaceLayout>
+    );
   }
 
   return (
     <ProjectWorkspaceLayout
       orgSlug={orgSlug}
       projectSlug={projectSlug}
-      projects={projects ?? []}
+      projects={projectsList}
       isProjectsPending={isPending}
     >
       {children}

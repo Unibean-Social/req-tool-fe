@@ -50,7 +50,7 @@ export function projectWorkspaceSubPathFromPathname(pathname: string): string {
   const p = pathname.split("/").filter(Boolean);
   if (p.length < 3 || p[1] !== "projects") return "dashboard";
   if (p[2] === "project-new") return "dashboard";
-  return p[3] || "dashboard";
+  return p.slice(3).join("/") || "dashboard";
 }
 
 export function buildProjectWorkspacePath(

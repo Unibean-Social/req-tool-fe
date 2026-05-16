@@ -227,20 +227,22 @@ export function OrgHomeList({ orgs }: OrgHomeListProps) {
               />
             </div>
           ) : null}
-          <Button
-            type="button"
-            variant="outline"
-            size="lg"
-            className={cn(
-              "h-11 shrink-0 border-2 font-semibold transition-colors",
-              "hover:border-brand-mint/55 hover:bg-brand-mint/10 hover:text-brand-mint",
-              "dark:hover:bg-brand-mint/15"
-            )}
-            onClick={() => setCreateOpen(true)}
-          >
-            <Plus className="size-4" aria-hidden />
-            Tạo tổ chức mới
-          </Button>
+          {orgs.length > 0 ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="lg"
+              className={cn(
+                "h-11 shrink-0 border-2 font-semibold transition-colors",
+                "hover:border-brand-mint/55 hover:bg-brand-mint/10 hover:text-brand-mint",
+                "dark:hover:bg-brand-mint/15"
+              )}
+              onClick={() => setCreateOpen(true)}
+            >
+              <Plus className="size-4" aria-hidden />
+              Tạo tổ chức mới
+            </Button>
+          ) : null}
         </div>
       </header>
 

@@ -5,12 +5,12 @@ export interface CreateOrgProjectRequest {
   name: string;
   description: string;
   context: string;
-  problems: string;
-  stakeholders: string;
-  businessGoals: string;
-  businessFlows: string;
-  businessRules: string;
-  proposedSolutions: string;
+  problems: string[];
+  stakeholders: string[];
+  businessGoals: string[];
+  businessFlows: string[];
+  businessRules: string[];
+  proposedSolutions: string[];
 }
 
 /** PATCH /api/v1/orgs/:org_id/projects/:project_id */
@@ -19,55 +19,67 @@ export interface UpdateOrgProjectRequest {
   description: string;
 }
 
-interface OrgProjectRowApi {
+/** Một dự án trên wire (GET list/detail/create). */
+export interface OrgProjectApiRow {
   id: string;
   org_id: string;
   name: string;
   slug: string;
   description: string;
-  context?: string | null;
-  problems?: string | null;
-  stakeholders?: string | null;
-  business_goals?: string | null;
-  business_flows?: string | null;
-  business_rules?: string | null;
-  proposed_solutions?: string | null;
+  context: string;
+  problems: string[];
+  stakeholders: string[];
+  business_goals: string[];
+  business_flows: string[];
+  business_rules: string[];
+  proposed_solutions: string[];
   created_at: string;
+}
+
+/** GET /api/v1/orgs/{org_id}/projects — path param `org_id`. */
+export interface ListOrgProjectsParams {
+  orgId: string;
+}
+
+/** GET /api/v1/orgs/{org_id}/projects/{project_id} — path `org_id`, `project_id`. */
+export interface GetOrgProjectParams {
+  orgId: string;
+  projectId: string;
 }
 
 interface CreateOrgProjectApiBody {
   name: string;
   description: string;
   context: string;
-  problems: string;
-  stakeholders: string;
-  business_goals: string;
-  business_flows: string;
-  business_rules: string;
-  proposed_solutions: string;
+  problems: string[];
+  stakeholders: string[];
+  business_goals: string[];
+  business_flows: string[];
+  business_rules: string[];
+  proposed_solutions: string[];
 }
 
 interface CreateOrgProjectApiResponse {
   success: boolean;
-  data: OrgProjectRowApi;
+  data: OrgProjectApiRow;
   message: string | null;
 }
 
 interface OrgProjectsListApiResponse {
   success: boolean;
-  data: OrgProjectRowApi[];
+  data: OrgProjectApiRow[];
   message: string | null;
 }
 
 interface OrgProjectDetailApiResponse {
   success: boolean;
-  data: OrgProjectRowApi;
+  data: OrgProjectApiRow;
   message: string | null;
 }
 
 interface UpdateOrgProjectApiResponse {
   success: boolean;
-  data: OrgProjectRowApi;
+  data: OrgProjectApiRow;
   message: string | null;
 }
 
@@ -79,12 +91,12 @@ export interface OrgProject {
   slug: string;
   description: string;
   context: string;
-  problems: string;
-  stakeholders: string;
-  businessGoals: string;
-  businessFlows: string;
-  businessRules: string;
-  proposedSolutions: string;
+  problems: string[];
+  stakeholders: string[];
+  businessGoals: string[];
+  businessFlows: string[];
+  businessRules: string[];
+  proposedSolutions: string[];
   createdAt: string;
 }
 
@@ -116,6 +128,30 @@ function trimField(s: string): string {
   return s.trim();
 }
 
+function normalizeStringList(items: string[]): string[] {
+  return items.map((s) => s.trim()).filter(Boolean);
+}
+
+function mapStringListFromApi(value: string[] | null | undefined): string[] {
+  if (!value?.length) return [];
+  return value.map((s) => String(s).trim()).filter(Boolean);
+}
+
+/** Hiển thị mảng dự án trong textarea (mỗi dòng một mục). */
+export function orgProjectListToLines(
+  items: string[] | null | undefined
+): string {
+  return (items ?? []).join("\n");
+}
+
+/** Parse textarea thành mảng gửi API (mỗi dòng không rỗng = một mục). */
+export function linesToOrgProjectList(text: string): string[] {
+  return text
+    .split(/\r?\n/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
 function toCreateOrgProjectApiBody(
   body: CreateOrgProjectRequest
 ): CreateOrgProjectApiBody {
@@ -123,16 +159,44 @@ function toCreateOrgProjectApiBody(
     name: trimField(body.name),
     description: trimField(body.description),
     context: trimField(body.context),
-    problems: trimField(body.problems),
-    stakeholders: trimField(body.stakeholders),
-    business_goals: trimField(body.businessGoals),
-    business_flows: trimField(body.businessFlows),
-    business_rules: trimField(body.businessRules),
-    proposed_solutions: trimField(body.proposedSolutions),
+    problems: normalizeStringList(body.problems),
+    stakeholders: normalizeStringList(body.stakeholders),
+    business_goals: normalizeStringList(body.businessGoals),
+    business_flows: normalizeStringList(body.businessFlows),
+    business_rules: normalizeStringList(body.businessRules),
+    proposed_solutions: normalizeStringList(body.proposedSolutions),
   };
 }
 
-function mapOrgProjectRow(row: OrgProjectRowApi): OrgProject {
+function resolveOrgId(orgIdOrParams: string | ListOrgProjectsParams): string {
+  const id =
+    typeof orgIdOrParams === "string" ? orgIdOrParams : orgIdOrParams.orgId;
+  const trimmed = id.trim();
+  if (!trimmed) {
+    throw new Error("org_id là bắt buộc");
+  }
+  return trimmed;
+}
+
+function resolveGetOrgProjectParams(
+  orgIdOrParams: string | GetOrgProjectParams,
+  projectIdArg?: string
+): GetOrgProjectParams {
+  if (typeof orgIdOrParams === "object") {
+    const orgId = orgIdOrParams.orgId.trim();
+    const projectId = orgIdOrParams.projectId.trim();
+    if (!orgId) throw new Error("org_id là bắt buộc");
+    if (!projectId) throw new Error("project_id là bắt buộc");
+    return { orgId, projectId };
+  }
+  const orgId = orgIdOrParams.trim();
+  const projectId = (projectIdArg ?? "").trim();
+  if (!orgId) throw new Error("org_id là bắt buộc");
+  if (!projectId) throw new Error("project_id là bắt buộc");
+  return { orgId, projectId };
+}
+
+function mapOrgProjectRow(row: OrgProjectApiRow): OrgProject {
   return {
     id: row.id,
     orgId: row.org_id,
@@ -140,12 +204,12 @@ function mapOrgProjectRow(row: OrgProjectRowApi): OrgProject {
     slug: row.slug,
     description: row.description ?? "",
     context: row.context ?? "",
-    problems: row.problems ?? "",
-    stakeholders: row.stakeholders ?? "",
-    businessGoals: row.business_goals ?? "",
-    businessFlows: row.business_flows ?? "",
-    businessRules: row.business_rules ?? "",
-    proposedSolutions: row.proposed_solutions ?? "",
+    problems: mapStringListFromApi(row.problems),
+    stakeholders: mapStringListFromApi(row.stakeholders),
+    businessGoals: mapStringListFromApi(row.business_goals),
+    businessFlows: mapStringListFromApi(row.business_flows),
+    businessRules: mapStringListFromApi(row.business_rules),
+    proposedSolutions: mapStringListFromApi(row.proposed_solutions),
     createdAt: row.created_at,
   };
 }
@@ -166,8 +230,29 @@ function mapOrgProjectsListResponse(
   return {
     success: body.success,
     message: body.message ?? null,
-    data: body.data.map(mapOrgProjectRow),
+    data: (body.data ?? []).map(mapOrgProjectRow),
   };
+}
+
+function assertOrgProjectsListSuccess(
+  body: OrgProjectsListApiResponse
+): OrgProjectsListApiResponse {
+  if (!body.success) {
+    throw new Error(body.message ?? "Không tải được danh sách dự án");
+  }
+  return body;
+}
+
+function assertOrgProjectDetailSuccess(
+  body: OrgProjectDetailApiResponse
+): OrgProjectDetailApiResponse {
+  if (!body.success) {
+    throw new Error(body.message ?? "Không tải được dự án");
+  }
+  if (!body.data?.id) {
+    throw new Error("Dữ liệu dự án không hợp lệ");
+  }
+  return body;
 }
 
 function mapOrgProjectDetailResponse(
@@ -191,23 +276,40 @@ function mapUpdateOrgProjectResponse(
 }
 
 export const fetchProject = {
-  /** GET /api/v1/orgs/:org_id/projects */
-  listOrgProjects: async (orgId: string): Promise<OrgProjectsListResponse> => {
+  /**
+   * GET /api/v1/orgs/{org_id}/projects
+   * @param orgIdOrParams — `org_id` trên path (string hoặc `{ orgId }`)
+   */
+  listOrgProjects: async (
+    orgIdOrParams: string | ListOrgProjectsParams
+  ): Promise<OrgProjectsListResponse> => {
+    const orgId = resolveOrgId(orgIdOrParams);
     const response = await apiService.get<OrgProjectsListApiResponse>(
       `/api/v1/orgs/${encodeURIComponent(orgId)}/projects`
     );
-    return mapOrgProjectsListResponse(response.data);
+    return mapOrgProjectsListResponse(
+      assertOrgProjectsListSuccess(response.data)
+    );
   },
 
-  /** GET /api/v1/orgs/:org_id/projects/:project_id */
+  /**
+   * GET /api/v1/orgs/{org_id}/projects/{project_id}
+   * @param orgIdOrParams — `org_id` + `project_id` (object hoặc hai string)
+   */
   getOrgProject: async (
-    orgId: string,
-    projectId: string
+    orgIdOrParams: string | GetOrgProjectParams,
+    projectId?: string
   ): Promise<OrgProjectDetailResponse> => {
-    const response = await apiService.get<OrgProjectDetailApiResponse>(
-      `/api/v1/orgs/${encodeURIComponent(orgId)}/projects/${encodeURIComponent(projectId)}`
+    const { orgId, projectId: pid } = resolveGetOrgProjectParams(
+      orgIdOrParams,
+      projectId
     );
-    return mapOrgProjectDetailResponse(response.data);
+    const response = await apiService.get<OrgProjectDetailApiResponse>(
+      `/api/v1/orgs/${encodeURIComponent(orgId)}/projects/${encodeURIComponent(pid)}`
+    );
+    return mapOrgProjectDetailResponse(
+      assertOrgProjectDetailSuccess(response.data)
+    );
   },
 
   /** POST /api/v1/orgs/:org_id/projects */

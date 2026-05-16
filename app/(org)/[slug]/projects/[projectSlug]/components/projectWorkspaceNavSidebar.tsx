@@ -5,8 +5,6 @@ import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  BookOpen,
-  CalendarDays,
   ChevronsUpDown,
   Check,
   Layers,
@@ -14,10 +12,12 @@ import {
   ListTodo,
   LogOut,
   MessageCircle,
+  Pencil,
+  PersonStanding,
   Plus,
   Search,
-  Sparkles,
-  UserRound,
+  Trash2,
+  UserRoundPlus,
   Users,
 } from "lucide-react";
 
@@ -32,7 +32,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
+import { useProjectActors, useDeleteProjectActor } from "@/hooks/useActor";
+import type { ProjectActor } from "@/lib/api/services/fetchActor";
 import { useUserMe } from "@/hooks/useUser";
 import type { Org } from "@/lib/api/services/fetchOrg";
 import { fetchProject } from "@/lib/api/services/fetchProject";
@@ -41,6 +45,13 @@ import { cn } from "@/lib/utils";
 
 import { useOrgWorkspace } from "../../../orgWorkspaceContext";
 import { CreateOrgDialog } from "../../../../components/createOrgDialog";
+import { CreateProjectActorDialog } from "./sub-task/actor/createProjectActorDialog";
+import { DeleteProjectActorDialog } from "./sub-task/actor/deleteProjectActorDialog";
+import { EditProjectActorDialog } from "./sub-task/actor/editProjectActorDialog";
+import {
+  ACTOR_USER_STORIES_EMPTY_MOCK_ACTOR_ID,
+  ACTOR_USER_STORIES_MOCK_ACTOR_ID,
+} from "../actors/[actorId]/components/userStory/actorUserStoriesMock";
 import {
   buildOrgEntryPath,
   projectWorkspaceSubPathFromPathname,
@@ -173,21 +184,345 @@ function pathActive(pathname: string, prefix: string): boolean {
   return p === prefix || p.startsWith(`${prefix}/`);
 }
 
+function pathsEqualIgnoreQuery(a: string, b: string): boolean {
+  const norm = (s: string) => {
+    const p = s.split("?")[0] ?? "";
+    return p.replace(/\/+$/, "") || "/";
+  };
+  return norm(a) === norm(b);
+}
+
+function ProjectWorkspaceActorsNav({
+  projectId,
+  projectsLoaded,
+  actorsBase,
+  pathname,
+  dashboardHref,
+  canManageActors,
+}: {
+  projectId: string | null;
+  projectsLoaded: boolean;
+  actorsBase: string;
+  pathname: string;
+  dashboardHref: string;
+  /** Chỉ owner tổ chức (`owner_id`) được sửa/xóa actor — đồng bộ `OrgWorkspaceContext.canManageOrgMembers` */
+  canManageActors: boolean;
+}) {
+  const [deleteTarget, setDeleteTarget] = useState<{
+    actorId: string;
+    name: string;
+  } | null>(null);
+
+  const [editTarget, setEditTarget] = useState<ProjectActor | null>(null);
+  const [editMutationBusy, setEditMutationBusy] = useState(false);
+
+  const actorsAtDeleteConfirmRef = useRef<ProjectActor[]>([]);
+
+  const router = useRouter();
+
+  const deleteActorMutation = useDeleteProjectActor({
+    onSuccess: (_void, variables) => {
+      setDeleteTarget(null);
+
+      const actorsList = actorsAtDeleteConfirmRef.current;
+      const deletedId = variables.actorId;
+      const deletedHref = `${actorsBase}/${encodeURIComponent(deletedId)}`;
+      if (!pathsEqualIgnoreQuery(pathname, deletedHref)) return;
+
+      const remaining = actorsList.filter((a) => a.id !== deletedId);
+      if (remaining.length === 0) {
+        router.replace(dashboardHref);
+        return;
+      }
+
+      const idx = actorsList.findIndex((a) => a.id === deletedId);
+      const nextActor =
+        idx >= 0
+          ? idx + 1 < actorsList.length
+            ? actorsList[idx + 1]
+            : idx > 0
+              ? actorsList[idx - 1]
+              : undefined
+          : undefined;
+
+      const fallback = remaining[0]!;
+      const target =
+        nextActor && nextActor.id !== deletedId ? nextActor : fallback;
+      router.replace(`${actorsBase}/${encodeURIComponent(target.id)}`);
+    },
+  });
+
+  const deletePending = deleteActorMutation.isPending;
+  const actorRowBusy = deletePending || editMutationBusy;
+
+  const { data: actors = [], isPending, isError } = useProjectActors(
+    projectsLoaded ? projectId : null
+  );
+
+  async function confirmDeleteActor() {
+    if (!projectId || !deleteTarget) return;
+    actorsAtDeleteConfirmRef.current = actors;
+    await deleteActorMutation.mutateAsync({
+      projectId,
+      actorId: deleteTarget.actorId,
+    });
+  }
+
+  if (!projectsLoaded) {
+    return (
+      <div className="space-y-0.5 py-0">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <Skeleton key={i} className="h-8 w-full rounded-lg" />
+        ))}
+      </div>
+    );
+  }
+
+  if (!projectId) {
+    return (
+      <p className="px-2 py-1.5 text-xs leading-snug text-muted-foreground">
+        Không tìm thấy dự án trong workspace này.
+      </p>
+    );
+  }
+
+  return (
+    <>
+      <div
+        className={cn(
+          "max-h-40 overflow-y-auto overscroll-contain scrollbar-none",
+          "[&::-webkit-scrollbar]:hidden"
+        )}
+      >
+        {isPending ? (
+          <div className="space-y-0.5 py-0">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} className="h-8 w-full rounded-lg" />
+            ))}
+          </div>
+        ) : isError ? (
+          <p className="px-2 py-1.5 text-xs leading-snug text-muted-foreground">
+            Không tải được actors.
+          </p>
+        ) : actors.length === 0 ? (
+          <p className="px-2 py-1.5 text-xs leading-snug text-muted-foreground">
+            Chưa có actors.
+          </p>
+        ) : (
+          <ul className="list-none space-y-px py-0" role="list">
+            {actors.map((actor) => {
+              const actorHref = `${actorsBase}/${encodeURIComponent(actor.id)}`;
+              const active = pathsEqualIgnoreQuery(pathname, actorHref);
+              if (!canManageActors) {
+                return (
+                  <li key={actor.id} className="min-w-0">
+                    <Link
+                      href={actorHref}
+                      className={cn(
+                        "flex w-full items-center gap-2.5 rounded-lg border border-transparent px-2.5 py-1.5 text-left text-sm transition-[color,background-color,border-color,box-shadow] duration-200 outline-none focus-visible:ring-2 focus-visible:ring-ring/45 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                        active
+                          ? "border-primary/30 bg-(--chart-1)/10 font-medium text-foreground shadow-sm ring-1 ring-primary/15"
+                          : "text-muted-foreground hover:bg-muted/40 hover:text-foreground"
+                      )}
+                    >
+                      <PersonStanding
+                        className="size-4 shrink-0 text-muted-foreground opacity-85"
+                        aria-hidden
+                      />
+                      <span className="min-w-0 flex-1 truncate">{actor.name}</span>
+                    </Link>
+                  </li>
+                );
+              }
+              return (
+                <li key={actor.id} className="min-w-0">
+                  <div
+                    className={cn(
+                      "flex items-center rounded-lg border border-transparent transition-colors",
+                      active
+                        ? "border-primary/30 bg-(--chart-1)/10 font-medium shadow-sm ring-1 ring-primary/15"
+                        : "hover:bg-muted/40"
+                    )}
+                  >
+                    <Link
+                      href={actorHref}
+                      className={cn(
+                        "flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-sm transition-[color] duration-200 outline-none focus-visible:ring-2 focus-visible:ring-ring/45 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                        active
+                          ? "text-foreground"
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      <PersonStanding
+                        className="size-4 shrink-0 text-muted-foreground opacity-85"
+                        aria-hidden
+                      />
+                      <span className="min-w-0 flex-1 truncate">{actor.name}</span>
+                    </Link>
+                    <div className="-mr-px flex shrink-0 items-center gap-px pr-px">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`Chỉnh sửa actor ${actor.name}`}
+                        title="Chỉnh sửa"
+                        disabled={actorRowBusy}
+                        className="size-6 shrink-0 text-muted-foreground hover:bg-primary/10 hover:text-foreground"
+                        onClick={() => setEditTarget(actor)}
+                      >
+                        <Pencil className="size-3" aria-hidden />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`Xóa actor ${actor.name}`}
+                        title="Xóa actor"
+                        disabled={actorRowBusy}
+                        className="size-6 shrink-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                        onClick={() =>
+                          setDeleteTarget({ actorId: actor.id, name: actor.name })
+                        }
+                      >
+                        <Trash2 className="size-3" aria-hidden />
+                      </Button>
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+
+      <DeleteProjectActorDialog
+        open={canManageActors && deleteTarget != null}
+        target={deleteTarget}
+        deletePending={deletePending}
+        onOpenChange={(next) => {
+          if (!next) setDeleteTarget(null);
+        }}
+        onConfirmDelete={confirmDeleteActor}
+      />
+      <EditProjectActorDialog
+        projectId={projectId}
+        actor={editTarget}
+        open={canManageActors && editTarget != null}
+        onOpenChange={(open) => {
+          if (!open) setEditTarget(null);
+        }}
+        onRowInteractBusy={setEditMutationBusy}
+      />
+    </>
+  );
+}
+
+function ProjectWorkspaceActorsSection({
+  projectId,
+  projectsLoaded,
+  actorsBase,
+  pathname,
+  dashboardHref,
+  canManageActors,
+}: {
+  projectId: string | null;
+  projectsLoaded: boolean;
+  actorsBase: string;
+  pathname: string;
+  dashboardHref: string;
+  /** Chỉ owner tổ chức mới có nút thêm/sửa/xóa actor */
+  canManageActors: boolean;
+}) {
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+
+  const canAdd =
+    canManageActors &&
+    projectsLoaded &&
+    typeof projectId === "string" &&
+    projectId.length > 0;
+
+  return (
+    <div
+      className="space-y-1"
+      data-actor-user-stories-mock={ACTOR_USER_STORIES_MOCK_ACTOR_ID}
+      data-actor-user-stories-empty-demo={ACTOR_USER_STORIES_EMPTY_MOCK_ACTOR_ID}
+    >
+      <div className="mt-1 border-t border-border/70 px-1 pt-3">
+        <div
+          className={cn(
+            "flex items-center gap-2 px-0.5 pb-2",
+            canManageActors ? "justify-between" : ""
+          )}
+        >
+          <p className="flex min-w-0 flex-1 items-center gap-2 m-0 text-xs font-bold tracking-wide text-foreground/95 uppercase">
+            <span
+              className="h-3.5 w-0.5 shrink-0 rounded-full bg-brand-mint/90 shadow-[0_0_6px_color-mix(in_oklab,var(--brand-mint)_50%,transparent)]"
+              aria-hidden
+            />
+            <span className="leading-snug">Actors</span>
+          </p>
+          {canManageActors ? (
+            <div className="-mr-px flex shrink-0 items-center gap-px pr-px">
+              <span
+                className="pointer-events-none size-6 shrink-0"
+                aria-hidden
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label="Thêm actor"
+                title="Thêm actor"
+                disabled={!canAdd}
+                className="size-6 shrink-0 text-muted-foreground hover:text-foreground"
+                onClick={() => setCreateDialogOpen(true)}
+              >
+                <UserRoundPlus className="size-3" aria-hidden />
+              </Button>
+            </div>
+          ) : null}
+        </div>
+      </div>
+      <div className="px-0.5">
+        <ProjectWorkspaceActorsNav
+          projectId={projectId}
+          projectsLoaded={projectsLoaded}
+          actorsBase={actorsBase}
+          pathname={pathname}
+          dashboardHref={dashboardHref}
+          canManageActors={canManageActors}
+        />
+      </div>
+
+      <CreateProjectActorDialog
+        projectId={projectId}
+        open={canManageActors && createDialogOpen}
+        onOpenChange={setCreateDialogOpen}
+        disabled={!canAdd}
+      />
+    </div>
+  );
+}
+
 type ProjectWorkspaceNavSidebarProps = {
   orgSlug: string;
   projectSlug: string;
+  projectId: string | null;
+  projectsLoaded: boolean;
   className?: string;
 };
 
 export function ProjectWorkspaceNavSidebar({
   orgSlug,
   projectSlug,
+  projectId,
+  projectsLoaded,
   className,
 }: ProjectWorkspaceNavSidebarProps) {
   const pathname = usePathname() ?? "";
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { slug, orgs, orgFromList } = useOrgWorkspace();
+  const { slug, orgs, orgFromList, canManageOrgMembers } = useOrgWorkspace();
   const encOrg = encodeURIComponent(orgSlug);
   const encProj = encodeURIComponent(projectSlug);
   const base = `/${encOrg}/projects/${encProj}`;
@@ -254,12 +589,9 @@ export function ProjectWorkspaceNavSidebar({
       dashboard: `${base}/dashboard`,
       exchange: `${base}/trao-doi`,
       members: `${base}/members`,
-      actors: `${base}/actors`,
+      actorsBase: `${base}/actors`,
       epics: `${base}/epics`,
-      features: `${base}/features`,
-      stories: `${base}/stories`,
       tasks: `${base}/tasks`,
-      sprints: `${base}/sprints`,
     }),
     [base]
   );
@@ -393,7 +725,7 @@ export function ProjectWorkspaceNavSidebar({
             <div className="space-y-1 px-0.5">
               <SidebarNavLink
                 href={nav.dashboard}
-                label="Bảng điều khiển"
+                label="Tổng quan dự án"
                 icon={LayoutDashboard}
                 active={pathActive(pathname, nav.dashboard)}
               />
@@ -404,20 +736,6 @@ export function ProjectWorkspaceNavSidebar({
                 active={pathActive(pathname, nav.exchange)}
               />
               <SidebarNavLink
-                href={nav.sprints}
-                label="Sprints"
-                icon={CalendarDays}
-                active={pathActive(pathname, nav.sprints)}
-              />
-            </div>
-          </div>
-
-          <div className="space-y-1">
-            <SidebarSectionTitle withDivider>
-              Thành viên (trong tổ chức)
-            </SidebarSectionTitle>
-            <div className="space-y-1 px-0.5">
-              <SidebarNavLink
                 href={nav.members}
                 label="Thành viên"
                 icon={Users}
@@ -426,32 +744,23 @@ export function ProjectWorkspaceNavSidebar({
             </div>
           </div>
 
+          <ProjectWorkspaceActorsSection
+            projectId={projectId}
+            projectsLoaded={projectsLoaded}
+            actorsBase={nav.actorsBase}
+            pathname={pathname}
+            dashboardHref={nav.dashboard}
+            canManageActors={canManageOrgMembers}
+          />
+
           <div className="space-y-1">
             <SidebarSectionTitle withDivider>Tính năng</SidebarSectionTitle>
             <div className="space-y-1 px-0.5">
-              <SidebarNavLink
-                href={nav.actors}
-                label="Actors"
-                icon={UserRound}
-                active={pathActive(pathname, nav.actors)}
-              />
               <SidebarNavLink
                 href={nav.epics}
                 label="Epics"
                 icon={Layers}
                 active={pathActive(pathname, nav.epics)}
-              />
-              <SidebarNavLink
-                href={nav.features}
-                label="Features"
-                icon={Sparkles}
-                active={pathActive(pathname, nav.features)}
-              />
-              <SidebarNavLink
-                href={nav.stories}
-                label="Stories"
-                icon={BookOpen}
-                active={pathActive(pathname, nav.stories)}
               />
               <SidebarNavLink
                 href={nav.tasks}
